@@ -163,7 +163,17 @@ export function parseSentryInput(input: string): ParseResult {
   } else {
     // It's a TASK — always resolve dates to the future
     const chronoParsed = chrono.parse(trimmed, new Date(), { forwardDate: true });
-    const dueDate = chronoParsed.length > 0 ? chronoParsed[0].start.date().getTime() : null;
+    let dueDate: number | null = null;
+    if (chronoParsed.length > 0) {
+      const start = chronoParsed[0].start;
+      // If time is not specified, default to end of day (23:59:59)
+      if (!start.isCertain('hour')) {
+        start.assign('hour', 23);
+        start.assign('minute', 59);
+        start.assign('second', 59);
+      }
+      dueDate = start.date().getTime();
+    }
 
     return {
       type: 'task',

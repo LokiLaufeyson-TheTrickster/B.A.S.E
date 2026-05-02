@@ -15,7 +15,11 @@ export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCar
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const date = task.dueDate ? new Date(task.dueDate) : null;
-  const hasTime = date && (date.getHours() !== 0 || date.getMinutes() !== 0);
+  // User-specified time is anything that's not midnight (default) or 23:59:59 (our date-only marker)
+  const hasTime = date && 
+    (date.getHours() !== 0 || date.getMinutes() !== 0) && 
+    !(date.getHours() === 23 && date.getMinutes() === 59);
+
   const dueStr = date
     ? date.toLocaleDateString('en-US', {
         month: 'short',
@@ -24,7 +28,16 @@ export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCar
       })
     : 'NO DEADLINE';
 
-  const isOverdue = task.dueDate && task.dueDate < Date.now() && !isCompleted && !isFailed;
+  const isOverdue = (() => {
+    if (!task.dueDate || isCompleted || isFailed) return false;
+    const now = Date.now();
+    const d = new Date(task.dueDate);
+    // If it's exactly midnight, assume the user meant "by the end of the day"
+    if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
+      d.setHours(23, 59, 59, 999);
+    }
+    return d.getTime() < now;
+  })();
 
   return (
     <div className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}>
