@@ -14,8 +14,14 @@ interface TaskCardProps {
 export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
-  const dueStr = task.dueDate
-    ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const date = task.dueDate ? new Date(task.dueDate) : null;
+  const hasTime = date && (date.getHours() !== 0 || date.getMinutes() !== 0);
+  const dueStr = date
+    ? date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        ...(hasTime ? { hour: 'numeric', minute: '2-digit' } : {})
+      })
     : 'NO DEADLINE';
 
   const isOverdue = task.dueDate && task.dueDate < Date.now() && !isCompleted && !isFailed;

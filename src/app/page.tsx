@@ -65,24 +65,44 @@ export default function HomePage() {
 
   // ── Filtered Data ────────────────────────────────────────────────────────────
   const filteredHabits = useMemo(() => {
-    let result = habits;
+    let result = [...habits];
     if (filterPriority !== null) {
       result = result.filter(h => h.priority === filterPriority);
     }
     if (filterTags.length > 0) {
       result = result.filter(h => filterTags.some(ft => h.tags.includes(ft)));
     }
+    
+    // Sort: targetTime (ASC), then priority (ASC)
+    result.sort((a, b) => {
+      if (a.targetTime !== b.targetTime) {
+        return a.targetTime.localeCompare(b.targetTime);
+      }
+      return a.priority - b.priority;
+    });
+
     return result;
   }, [habits, filterPriority, filterTags]);
 
   const filteredTasks = useMemo(() => {
-    let result = tasks;
+    let result = [...tasks];
     if (filterPriority !== null) {
       result = result.filter(t => t.priority === filterPriority);
     }
     if (filterTags.length > 0) {
       result = result.filter(t => filterTags.some(ft => t.tags.includes(ft)));
     }
+
+    // Sort: dueDate (ASC), then priority (ASC)
+    result.sort((a, b) => {
+      const timeA = a.dueDate ?? Infinity;
+      const timeB = b.dueDate ?? Infinity;
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+      return a.priority - b.priority;
+    });
+
     return result;
   }, [tasks, filterPriority, filterTags]);
 
