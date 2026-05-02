@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# B.A.S.E. — Behavioral Analysis & Systematic Enforcement
 
-## Getting Started
+A hostile, AI-powered behavioral warfare engine. Track habits, enforce deadlines, and confront your own excuses through an interrogation-style AI partner.
 
-First, run the development server:
+**No comfort. No motivation. Just data and accountability.**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## What It Does
+
+- **Habit Tracking** — Lock habits with time targets, frequency, priority, and tags. The system monitors your compliance and calculates risk scores.
+- **Task Management** — NLP-powered input parses natural language ("Submit report friday #p2 #work") into structured tasks with deadlines.
+- **Thinking Partner** — An AI-powered hostile auditor that confronts you when you're failing. Uses your actual data (risk score, resilience, streak) against you.
+- **Risk Engine** — Calculates per-habit risk based on completion patterns. Miss your window? Risk climbs. Skip days? Resilience drops.
+- **Breach Detection** — When a habit crosses the risk threshold, the system triggers a breach overlay forcing confrontation.
+- **Dojo** — Audio track management for focus/motivation sessions.
+
+## AI Architecture
+
+Multi-provider fallback chain:
+
+```
+Gemini 2.5 Flash (Primary)
+    ↓ fails/disabled/rate-limited
+OpenRouter Model #1
+    ↓ fails
+OpenRouter Model #2...N
+    ↓ all fail
+Offline Pattern-Matching Fallback
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Gemini** can be enabled/disabled from Settings
+- **OpenRouter** supports unlimited model strings in priority order
+- **Connection Testing** — Per-model "Test" button validates connectivity
+- **Provider status** only shows ACTIVE after at least 1 model passes a live test
+- All API keys stored client-side in `localStorage` — never sent to any server
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Layer | Tech |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Database | Dexie.js (IndexedDB) |
+| AI | Gemini API + OpenRouter API |
+| NLP Parser | chrono-node (date parsing) |
+| Styling | Vanilla CSS — tactical brutalism palette |
+| State | Local-first, zero backend |
 
-## Learn More
+## Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### API Keys (Optional)
 
-## Deploy on Vercel
+Click ⚙ in the header to configure:
+- **Gemini API Key** — Get from [aistudio.google.com](https://aistudio.google.com/apikey)
+- **OpenRouter API Key** — Get from [openrouter.ai](https://openrouter.ai/keys)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Without keys, the Thinking Partner uses offline pattern-matching fallback.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Input Syntax
+
+```
+Cold shower 6am everyday #p1 #discipline #health    → Habit
+Submit report friday #p2 #work                      → Task (next Friday)
+Buy groceries tomorrow #p3 #errand                  → Task (tomorrow)
+Read 30 pages 9pm weekdays #p2 #growth              → Habit (Mon-Fri)
+```
+
+## Design Philosophy
+
+**Tactical Brutalism.** Black/white/crimson. Monospace typography. No rounded corners on your excuses. The interface is deliberately hostile — it's a tool for people who are tired of gentle productivity apps that let them fail quietly.
+
+---
+
+*Built with zero patience for mediocrity.*
