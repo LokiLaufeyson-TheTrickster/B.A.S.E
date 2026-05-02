@@ -91,9 +91,11 @@ export default function HomePage() {
     await loadData();
   };
 
-  const handleHabitDelete = async (id: number) => {
+  const handleHabitDelete = async (id: number, clean = false) => {
     await db.habits.delete(id);
-    await db.logs.where('habitId').equals(id).delete();
+    if (!clean) {
+      await db.logs.where('habitId').equals(id).delete();
+    }
     await loadData();
   };
 
@@ -104,6 +106,11 @@ export default function HomePage() {
 
   const handleTaskFail = async (id: number) => {
     await db.tasks.update(id, { status: 'failed', completedAt: Date.now() });
+    await loadData();
+  };
+
+  const handleTaskDelete = async (id: number) => {
+    await db.tasks.delete(id);
     await loadData();
   };
 
@@ -330,7 +337,7 @@ export default function HomePage() {
               ) : (
                 filteredTasks.map((task) => (
                   <TaskCard key={task.id} task={task}
-                    onComplete={handleTaskComplete} onFail={handleTaskFail} />
+                    onComplete={handleTaskComplete} onFail={handleTaskFail} onDelete={handleTaskDelete} />
                 ))
               )}
             </div>

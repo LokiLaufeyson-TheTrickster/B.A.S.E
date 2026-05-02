@@ -32,6 +32,7 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
   const [orStatuses, setORStatuses] = useState<Record<string, TestStatus>>({});
   const [purgeConfirm, setPurgeConfirm] = useState(false);
   const [providerActive, setProviderActive] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const refreshProvider = () => setProviderActive(hasAnyProvider());
 
@@ -151,195 +152,243 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
     <div className="tp-overlay" style={{ zIndex: 700 }}>
       <div className="tp-container animate-slide-up" style={{ maxWidth: '520px', maxHeight: '85vh', overflow: 'auto' }}>
         <div className="tp-header">
-          <span className="tp-header-title">SETTINGS — AI PROVIDERS</span>
-          <button onClick={onClose} style={{ color: 'var(--gray-500)', fontSize: '16px' }}>✕</button>
+          <span className="tp-header-title">
+            {showInfo ? 'IDENTITY METRICS — EXPLAINED' : 'SETTINGS — AI PROVIDERS'}
+          </span>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => setShowInfo(!showInfo)}
+              title="Metrics Information"
+              style={{
+                color: showInfo ? 'var(--crimson)' : 'var(--gray-500)',
+                fontSize: '18px',
+                fontWeight: 900
+              }}
+            >
+              ?
+            </button>
+            <button onClick={onClose} style={{ color: 'var(--gray-500)', fontSize: '16px' }}>✕</button>
+          </div>
         </div>
 
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          {/* Provider Status */}
-          <div style={{
-            padding: '10px 14px', borderRadius: 'var(--radius)',
-            border: `1px solid ${providerActive ? 'var(--green)' : 'var(--amber)'}`,
-            background: providerActive ? 'rgba(0,255,0,0.03)' : 'rgba(255,200,0,0.03)',
-            fontSize: '10px', fontFamily: 'var(--font-mono)',
-            letterSpacing: '1px', textTransform: 'uppercase',
-            color: providerActive ? 'var(--green)' : 'var(--amber)',
-          }}>
-            {providerActive ? '● AI PROVIDER ACTIVE — VERIFIED' : '○ NO VERIFIED PROVIDER — TEST A MODEL TO ACTIVATE'}
-          </div>
-
-          {/* ── Gemini ─────────────────────────────────────────────────────── */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>GEMINI API KEY (PRIMARY)</label>
-              <button
-                onClick={() => { const next = !geminiOn; setGeminiOn(next); setGeminiEnabled(next); }}
-                style={{
-                  ...btnSmall, fontSize: '8px',
-                  color: geminiOn ? 'var(--green)' : 'var(--gray-500)',
-                  border: `1px solid ${geminiOn ? 'var(--green)' : 'var(--gray-300)'}`,
-                }}
-              >
-                {geminiOn ? 'ENABLED' : 'DISABLED'}
-              </button>
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
-              {geminiOn ? '' : 'Gemini skipped — going straight to OpenRouter. '}
-              Get key at{' '}
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
-                style={{ color: 'var(--crimson)' }}>
-                aistudio.google.com
-              </a>
-            </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <input
-                type="password"
-                value={geminiKey}
-                onChange={e => { setGeminiKeyLocal(e.target.value); setGeminiStatus('idle'); }}
-                placeholder="AIza..."
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button
-                onClick={handleTestGemini}
-                disabled={!geminiKey.trim() || geminiStatus === 'testing'}
-                style={{
-                  ...btnSmall,
-                  color: statusColor(geminiStatus),
-                  border: `1px solid ${statusColor(geminiStatus)}`,
-                }}
-              >
-                {geminiStatus === 'testing' ? 'TESTING...' : geminiStatus === 'pass' ? 'CONNECTED ✓' : geminiStatus === 'rate_limited' ? '429 RATE LIMITED' : geminiStatus === 'fail' ? 'FAILED ✕' : 'TEST'}
-              </button>
-            </div>
-            {geminiError && (
-              <div style={{ fontSize: '9px', color: 'var(--amber)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                {geminiError}
-              </div>
-            )}
-          </div>
-
-          {/* ── OpenRouter ──────────────────────────────────────────────── */}
-          <div>
-            <label style={labelStyle}>OPENROUTER API KEY (FALLBACK)</label>
-            <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
-              Falls back to OpenRouter if Gemini fails. Get key at{' '}
-              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer"
-                style={{ color: 'var(--crimson)' }}>
-                openrouter.ai
-              </a>
-            </div>
-            <input
-              type="password"
-              value={orKey}
-              onChange={e => setORKeyLocal(e.target.value)}
-              onBlur={handleSaveOR}
-              placeholder="sk-or-..."
-              style={inputStyle}
-            />
-          </div>
-
-          {/* ── OR Models ──────────────────────────────────────────────── */}
-          <div>
-            <label style={labelStyle}>OPENROUTER MODELS (FALLBACK ORDER)</label>
-            <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
-              Add model strings in priority order. First working model wins.
-              <br />Example: <code style={{ color: 'var(--ghost)' }}>google/gemini-2.0-flash-exp:free</code>
+        {showInfo ? (
+          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: 1.6 }}>
+              The B.A.S.E. Identity Engine calculates your execution vector using five core factors. 
+              Drift is measured against your personal peak performance.
             </div>
 
-            {/* Existing models */}
-            {orModels.map((model, i) => (
-              <div key={model} style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 0', borderBottom: '1px solid var(--gray-200)',
-              }}>
-                <span style={{
-                  fontSize: '9px', fontFamily: 'var(--font-mono)',
-                  color: 'var(--gray-500)', width: '16px',
-                }}>{i + 1}.</span>
-                <span style={{
-                  flex: 1, fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--ghost)',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>{model}</span>
-                <span style={{ fontSize: '11px', color: statusColor(orStatuses[model] || 'idle') }}>
-                  {statusIcon(orStatuses[model] || 'idle')}
-                </span>
-                <button
-                  onClick={() => handleTestOR(model)}
-                  disabled={!orKey.trim() || orStatuses[model] === 'testing'}
-                  style={{
-                    ...btnSmall, fontSize: '8px',
-                    color: 'var(--gray-500)',
-                    border: '1px solid var(--gray-300)',
-                  }}
-                >
-                  {orStatuses[model] === 'testing' ? '...' : 'TEST'}
-                </button>
-                <button
-                  onClick={() => handleRemoveModel(model)}
-                  style={{
-                    ...btnSmall, fontSize: '12px',
-                    color: 'var(--gray-400)',
-                    border: 'none', padding: '4px 6px',
-                  }}
-                >
-                  ✕
-                </button>
+            {[
+              { label: 'EXEC (Execution Rate)', desc: 'Percentage of habits completed versus scheduled. Archiving habits (keeping history) prevents this from dropping when you remove a task.' },
+              { label: 'RISK⁻¹ (Stability)', desc: 'The inverse of your average Risk Score. Risk is calculated based on timing drift and execution volatility. Lower drift = Higher stability.' },
+              { label: 'CONSIST (Consistency)', desc: 'Measures the standard deviation of your execution timestamps. Doing things at the EXACT same time every day maximizes this score.' },
+              { label: 'STREAK (Momentum)', desc: 'Normalized average of all habit streaks. A 30-day streak across all habits represents 100% momentum.' },
+              { label: 'RESIL (Resilience)', desc: 'Your average resilience value. Resilience increases with every completion (+5%) and is the primary buffer against Breach Mode.' }
+            ].map(f => (
+              <div key={f.label} style={{ borderLeft: '2px solid var(--gray-200)', paddingLeft: '16px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '2px', color: 'var(--white)', marginBottom: '4px' }}>{f.label}</div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: 1.4 }}>{f.desc}</div>
               </div>
             ))}
 
-            {/* Add model */}
-            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+            <div style={{ 
+              marginTop: '12px', padding: '12px', background: 'rgba(255,0,60,0.05)', 
+              border: '1px solid var(--crimson-glow)', borderRadius: 'var(--radius)' 
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--crimson)', marginBottom: '4px', letterSpacing: '1px' }}>CLEAN DELETION</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-400)', lineHeight: 1.4 }}>
+                Deleting a habit normally wipes its logs, which can lower your EXEC rate. 
+                Use **ARCHIVE** on Habits or **CANCEL** on Tasks to remove them from your view while preserving their positive impact on your metrics.
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+            {/* Provider Status */}
+            <div style={{
+              padding: '10px 14px', borderRadius: 'var(--radius)',
+              border: `1px solid ${providerActive ? 'var(--green)' : 'var(--amber)'}`,
+              background: providerActive ? 'rgba(0,255,0,0.03)' : 'rgba(255,200,0,0.03)',
+              fontSize: '10px', fontFamily: 'var(--font-mono)',
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: providerActive ? 'var(--green)' : 'var(--amber)',
+            }}>
+              {providerActive ? '● AI PROVIDER ACTIVE — VERIFIED' : '○ NO VERIFIED PROVIDER — TEST A MODEL TO ACTIVATE'}
+            </div>
+
+            {/* ── Gemini ─────────────────────────────────────────────────────── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>GEMINI API KEY (PRIMARY)</label>
+                <button
+                  onClick={() => { const next = !geminiOn; setGeminiOn(next); setGeminiEnabled(next); }}
+                  style={{
+                    ...btnSmall, fontSize: '8px',
+                    color: geminiOn ? 'var(--green)' : 'var(--gray-500)',
+                    border: `1px solid ${geminiOn ? 'var(--green)' : 'var(--gray-300)'}`,
+                  }}
+                >
+                  {geminiOn ? 'ENABLED' : 'DISABLED'}
+                </button>
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
+                {geminiOn ? '' : 'Gemini skipped — going straight to OpenRouter. '}
+                Get key at{' '}
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--crimson)' }}>
+                  aistudio.google.com
+                </a>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={e => { setGeminiKeyLocal(e.target.value); setGeminiStatus('idle'); }}
+                  placeholder="AIza..."
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                <button
+                  onClick={handleTestGemini}
+                  disabled={!geminiKey.trim() || geminiStatus === 'testing'}
+                  style={{
+                    ...btnSmall,
+                    color: statusColor(geminiStatus),
+                    border: `1px solid ${statusColor(geminiStatus)}`,
+                  }}
+                >
+                  {geminiStatus === 'testing' ? 'TESTING...' : geminiStatus === 'pass' ? 'CONNECTED ✓' : geminiStatus === 'rate_limited' ? '429 RATE LIMITED' : geminiStatus === 'fail' ? 'FAILED ✕' : 'TEST'}
+                </button>
+              </div>
+              {geminiError && (
+                <div style={{ fontSize: '9px', color: 'var(--amber)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                  {geminiError}
+                </div>
+              )}
+            </div>
+
+            {/* ── OpenRouter ──────────────────────────────────────────────── */}
+            <div>
+              <label style={labelStyle}>OPENROUTER API KEY (FALLBACK)</label>
+              <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
+                Falls back to OpenRouter if Gemini fails. Get key at{' '}
+                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--crimson)' }}>
+                  openrouter.ai
+                </a>
+              </div>
               <input
-                type="text"
-                value={newModel}
-                onChange={e => setNewModel(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddModel()}
-                placeholder="model/name e.g. anthropic/claude-3.5-sonnet"
-                style={{ ...inputStyle, flex: 1, fontSize: '11px' }}
+                type="password"
+                value={orKey}
+                onChange={e => setORKeyLocal(e.target.value)}
+                onBlur={handleSaveOR}
+                placeholder="sk-or-..."
+                style={inputStyle}
               />
+            </div>
+
+            {/* ── OR Models ──────────────────────────────────────────────── */}
+            <div>
+              <label style={labelStyle}>OPENROUTER MODELS (FALLBACK ORDER)</label>
+              <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginBottom: '8px', lineHeight: 1.5 }}>
+                Add model strings in priority order. First working model wins.
+                <br />Example: <code style={{ color: 'var(--ghost)' }}>google/gemini-2.0-flash-exp:free</code>
+              </div>
+
+              {/* Existing models */}
+              {orModels.map((model, i) => (
+                <div key={model} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '6px 0', borderBottom: '1px solid var(--gray-200)',
+                }}>
+                  <span style={{
+                    fontSize: '9px', fontFamily: 'var(--font-mono)',
+                    color: 'var(--gray-500)', width: '16px',
+                  }}>{i + 1}.</span>
+                  <span style={{
+                    flex: 1, fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--ghost)',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>{model}</span>
+                  <span style={{ fontSize: '11px', color: statusColor(orStatuses[model] || 'idle') }}>
+                    {statusIcon(orStatuses[model] || 'idle')}
+                  </span>
+                  <button
+                    onClick={() => handleTestOR(model)}
+                    disabled={!orKey.trim() || orStatuses[model] === 'testing'}
+                    style={{
+                      ...btnSmall, fontSize: '8px',
+                      color: 'var(--gray-500)',
+                      border: '1px solid var(--gray-300)',
+                    }}
+                  >
+                    {orStatuses[model] === 'testing' ? '...' : 'TEST'}
+                  </button>
+                  <button
+                    onClick={() => handleRemoveModel(model)}
+                    style={{
+                      ...btnSmall, fontSize: '12px',
+                      color: 'var(--gray-400)',
+                      border: 'none', padding: '4px 6px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              {/* Add model */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                <input
+                  type="text"
+                  value={newModel}
+                  onChange={e => setNewModel(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddModel()}
+                  placeholder="model/name e.g. anthropic/claude-3.5-sonnet"
+                  style={{ ...inputStyle, flex: 1, fontSize: '11px' }}
+                />
+                <button
+                  onClick={handleAddModel}
+                  disabled={!newModel.trim()}
+                  style={{
+                    ...btnSmall,
+                    color: 'var(--crimson)',
+                    border: '1px solid var(--crimson)',
+                  }}
+                >
+                  ADD
+                </button>
+              </div>
+            </div>
+
+            {/* ── Danger Zone ──────────────────────────────────────────── */}
+            <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px' }}>
+              <label style={{ ...labelStyle, color: 'var(--crimson)' }}>DANGER ZONE</label>
+              {purgeConfirm && (
+                <div style={{
+                  fontSize: '10px', color: 'var(--crimson)',
+                  marginBottom: '8px', fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.5px',
+                }}>
+                  ⚠ THIS WILL DELETE ALL HABITS, TASKS, LOGS, AND DOJO TRACKS. CLICK AGAIN TO CONFIRM.
+                </div>
+              )}
               <button
-                onClick={handleAddModel}
-                disabled={!newModel.trim()}
+                onClick={handlePurge}
                 style={{
-                  ...btnSmall,
-                  color: 'var(--crimson)',
-                  border: '1px solid var(--crimson)',
+                  ...btnSmall, width: '100%', padding: '12px',
+                  color: purgeConfirm ? 'var(--white)' : 'var(--crimson)',
+                  border: `1px solid var(--crimson)`,
+                  background: purgeConfirm ? 'var(--crimson)' : 'transparent',
                 }}
               >
-                ADD
+                {purgeConfirm ? 'CONFIRM — PURGE EVERYTHING' : 'PURGE ALL DATA'}
               </button>
             </div>
           </div>
-
-          {/* ── Danger Zone ──────────────────────────────────────────── */}
-          <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px' }}>
-            <label style={{ ...labelStyle, color: 'var(--crimson)' }}>DANGER ZONE</label>
-            {purgeConfirm && (
-              <div style={{
-                fontSize: '10px', color: 'var(--crimson)',
-                marginBottom: '8px', fontFamily: 'var(--font-mono)',
-                letterSpacing: '0.5px',
-              }}>
-                ⚠ THIS WILL DELETE ALL HABITS, TASKS, LOGS, AND DOJO TRACKS. CLICK AGAIN TO CONFIRM.
-              </div>
-            )}
-            <button
-              onClick={handlePurge}
-              style={{
-                ...btnSmall, width: '100%', padding: '12px',
-                color: purgeConfirm ? 'var(--white)' : 'var(--crimson)',
-                border: `1px solid var(--crimson)`,
-                background: purgeConfirm ? 'var(--crimson)' : 'transparent',
-              }}
-            >
-              {purgeConfirm ? 'CONFIRM — PURGE EVERYTHING' : 'PURGE ALL DATA'}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

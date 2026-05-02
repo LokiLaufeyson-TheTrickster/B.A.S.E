@@ -8,7 +8,7 @@ import ThinkingPartner from './ThinkingPartner';
 interface HabitCardProps {
   habit: Habit;
   onComplete: (id: number) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number, clean?: boolean) => void;
 }
 
 function getRiskLabel(score: number) {
@@ -106,6 +106,7 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
           </button>
           <button
             onClick={() => { if (habit.id) onDelete(habit.id); setShowActions(false); }}
+            title="Deletes habit and all its history (May impact metrics)"
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
@@ -116,6 +117,26 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
             }}
           >
             DELETE
+          </button>
+          <button
+            onClick={() => {
+              if (habit.id) {
+                // We'll add an onArchive prop to HomePage
+                onDelete(habit.id, true); // True for "Clean/Archive"
+              }
+              setShowActions(false);
+            }}
+            title="Removes habit but keeps history (Safe for metrics)"
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--gray-400)', padding: '6px 12px',
+              border: '1px solid var(--gray-200)',
+              borderRadius: 'var(--radius)',
+              cursor: 'pointer',
+            }}
+          >
+            ARCHIVE
           </button>
         </div>
       )}

@@ -8,9 +8,10 @@ interface TaskCardProps {
   task: Task;
   onComplete: (id: number) => void;
   onFail: (id: number) => void;
+  onDelete: (id: number) => void;
 }
 
-export default function TaskCard({ task, onComplete, onFail }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const dueStr = task.dueDate
@@ -41,24 +42,46 @@ export default function TaskCard({ task, onComplete, onFail }: TaskCardProps) {
         )}
       </div>
 
-      {/* Fail button */}
+      {/* Actions */}
       {!isCompleted && !isFailed && (
-        <button
-          onClick={() => task.id && onFail(task.id)}
-          title="Mark as failed / can't do"
-          style={{
-            fontSize: '9px', fontWeight: 700,
-            letterSpacing: '1px', textTransform: 'uppercase',
-            color: 'var(--gray-500)', padding: '6px 10px',
-            border: '1px solid var(--gray-300)',
-            borderRadius: 'var(--radius)',
-            cursor: 'pointer',
-            transition: 'var(--transition)',
-            marginRight: '8px',
-          }}
-        >
-          FAIL
-        </button>
+        <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+          <button
+            onClick={() => task.id && onFail(task.id)}
+            title="Mark as failed"
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--gray-500)', padding: '6px 10px',
+              border: '1px solid var(--gray-300)',
+              borderRadius: 'var(--radius)',
+              cursor: 'pointer',
+              transition: 'var(--transition)',
+            }}
+          >
+            FAIL
+          </button>
+          <button
+            onClick={() => {
+              if (task.id) {
+                // Pass a specific flag or use a different handler
+                // For now, let's assume we add an onDelete prop
+                onDelete && onDelete(task.id);
+              }
+            }}
+            title="Delete task (No impact)"
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--gray-400)', padding: '6px 10px',
+              border: '1px solid var(--gray-200)',
+              borderRadius: 'var(--radius)',
+              cursor: 'pointer',
+              transition: 'var(--transition)',
+            }}
+          >
+            CANCEL
+          </button>
+        </div>
       )}
 
       <Executioner

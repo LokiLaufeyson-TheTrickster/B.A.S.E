@@ -635,7 +635,7 @@ input:focus, textarea:focus { border-color: var(--crimson); box-shadow: 0 0 0 1p
   .app-header .header-stats > div { display: none; }
   .app-header .header-stats > button { display: inline-flex; }
   .tp-overlay { padding: 12px; }
-  .tp-container { max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
+  .tp-container { width: 100%; max-width: 100%; max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
   .tp-messages { max-height: none; flex: 1; padding: 16px; min-height: 150px; }
   .sentry-container { padding: 16px; }
   .item-list { padding: 8px 12px; }
