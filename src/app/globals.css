@@ -632,7 +632,8 @@ input:focus, textarea:focus { border-color: var(--crimson); box-shadow: 0 0 0 1p
 /* ── RESPONSIVE ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .app-header { padding: 12px 16px; }
-  .app-header .header-stats { display: none; }
+  .app-header .header-stats > div { display: none; }
+  .app-header .header-stats > button { display: inline-flex; }
   .sentry-container { padding: 16px; }
   .item-list { padding: 8px 12px; }
   .identity-vector-grid { grid-template-columns: repeat(3, 1fr); }
