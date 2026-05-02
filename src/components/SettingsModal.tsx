@@ -155,14 +155,16 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
           <span className="tp-header-title">
             {showInfo ? 'IDENTITY METRICS — EXPLAINED' : 'SETTINGS — AI PROVIDERS'}
           </span>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <button
               onClick={() => setShowInfo(!showInfo)}
-              title="Metrics Information"
+              title="Identity Tutorial & Metrics FAQ"
               style={{
-                color: showInfo ? 'var(--crimson)' : 'var(--gray-500)',
-                fontSize: '18px',
-                fontWeight: 900
+                color: 'var(--crimson)',
+                fontSize: '20px',
+                fontWeight: 900,
+                textShadow: '0 0 10px var(--crimson-pulse)',
+                animation: !showInfo ? 'breachPulse 2s infinite' : 'none'
               }}
             >
               ?
@@ -173,6 +175,17 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
 
         {showInfo ? (
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Tutorial Section */}
+            <div style={{ padding: '16px', background: 'var(--gray-100)', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--amber)', marginBottom: '8px', letterSpacing: '2px' }}>⚡ SYSTEM TUTORIAL — QUICK START</div>
+              <ul style={{ fontSize: '11px', color: 'var(--gray-500)', paddingLeft: '16px', lineHeight: 1.6 }}>
+                <li><b style={{ color: 'var(--white)' }}>SENTRY PARSER:</b> Use natural language. <i>"Gym every mon, wed, fri 7am #p1"</i> or <i>"Buy groceries by tomorrow #p3"</i></li>
+                <li><b style={{ color: 'var(--white)' }}>BREACH MODE:</b> If you miss a habit, the system locks tasks and Dojo tracks until you confront the breach.</li>
+                <li><b style={{ color: 'var(--white)' }}>THINKING PARTNER:</b> Click "CONFRONT" on a breached habit to negotiate with the AI and clear the lock.</li>
+                <li><b style={{ color: 'var(--white)' }}>CLEAN DELETE:</b> Use "ARCHIVE" (Habits) or "CANCEL" (Tasks) to remove items without tanking your metrics.</li>
+              </ul>
+            </div>
+
             <div style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: 1.6 }}>
               The B.A.S.E. Identity Engine calculates your execution vector using five core factors. 
               Drift is measured against your personal peak performance.

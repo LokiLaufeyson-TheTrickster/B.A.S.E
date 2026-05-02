@@ -16,6 +16,7 @@ import Marquee from '@/components/Marquee';
 type TabType = 'habits' | 'tasks' | 'dojo' | 'identity';
 
 export default function HomePage() {
+  console.log('B.A.S.E. v1.1 — Metrics & Tutorial Active');
   const [activeTab, setActiveTab] = useState<TabType>('habits');
   const [habits, setHabits] = useState<Habit[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
