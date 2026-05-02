@@ -133,11 +133,11 @@ async function queryOpenRouter(ctx: ThinkingPartnerContext, model: string): Prom
   const apiKey = getORKey();
   if (!apiKey) return null;
 
-  const messages = [
-    { role: 'system' as const, content: SYSTEM_PROMPT + '\n\n' + buildHabitContext(ctx) },
+  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+    { role: 'system', content: SYSTEM_PROMPT + '\n\n' + buildHabitContext(ctx) },
   ];
   for (const msg of ctx.conversationHistory) {
-    messages.push({ role: msg.role === 'system' ? 'assistant' as const : 'user' as const, content: msg.content });
+    messages.push({ role: msg.role === 'system' ? 'assistant' : 'user', content: msg.content });
   }
 
   try {
