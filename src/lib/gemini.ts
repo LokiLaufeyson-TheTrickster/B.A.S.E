@@ -249,6 +249,16 @@ export interface RiskAnalysis {
   explanation: string;
 }
 
+function extractJSON(text: string): any {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {
   const prompt = `You are a cold, data-driven AUDITOR. Analyze this ${ctx.isTask ? 'task' : 'habit'} and predict the RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic.
 A score of 1.0 means failure is certain. 0.0 means perfect trajectory.
@@ -283,9 +293,11 @@ Response MUST be a JSON object with keys "score" (number) and "explanation" (str
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (text) {
-          const parsed = JSON.parse(text);
-          await logDebug('gemini', 'gemini-2.5-flash (analyze)', prompt, text);
-          return { score: parsed.score, explanation: parsed.explanation };
+          const parsed = extractJSON(text);
+          if (parsed && typeof parsed.score !== 'undefined') {
+            await logDebug('gemini', 'gemini-2.5-flash (analyze)', prompt, text);
+            return { score: Number(parsed.score) || 0, explanation: String(parsed.explanation || "") };
+          }
         }
       }
     } catch (e) {
@@ -317,8 +329,11 @@ Response MUST be a JSON object with keys "score" (number) and "explanation" (str
           const data = await res.json();
           const text = data.choices?.[0]?.message?.content?.trim();
           if (text) {
-            await logDebug('openrouter', `${model} (explain)`, prompt, text);
-            return text;
+            const parsed = extractJSON(text);
+            if (parsed && typeof parsed.score !== 'undefined') {
+              await logDebug('openrouter', `${model} (analyze)`, prompt, text);
+              return { score: Number(parsed.score) || 0, explanation: String(parsed.explanation || "") };
+            }
           }
         }
       } catch {}
