@@ -49,9 +49,11 @@ export default function HomePage() {
 
     if (breached.length > 0 && !breachAcknowledged) {
       setShowBreach(true);
-    } else {
+    } else if (breached.length === 0) {
       setShowBreach(false);
-      setBreachAcknowledged(false); // Reset if no breaches
+      setBreachAcknowledged(false); // Only reset if no breaches remain
+    } else {
+      setShowBreach(false); // Acknowledged but still breached
     }
   }, [breachAcknowledged]);
 
