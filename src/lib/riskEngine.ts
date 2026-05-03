@@ -11,7 +11,7 @@
  */
 
 import { db, type Habit, type HabitLog, type Task } from './db';
-import { explainRisk } from './gemini';
+import { analyzeRisk } from './gemini';
 import { sendPushNotification } from './ntfy';
 
 const BREACH_THRESHOLD = 0.75;
@@ -142,55 +142,68 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
     const { score: riskScore, logsCount } = await calculateRiskScore(habit);
     const isBreached = riskScore > BREACH_THRESHOLD;
     let riskExplanation = habit.riskExplanation;
+    let finalScore = riskScore;
 
-    if (isBreached && (force || !riskExplanation)) {
-      riskExplanation = await explainRisk({
+    const oneHour = 3600 * 1000;
+    const needsAudit = !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > oneHour);
+
+    if (force || needsAudit) {
+      const analysis = await analyzeRisk({
         habitTitle: habit.title,
         riskScore,
         resilienceValue: habit.resilienceValue,
         streakCount: habit.streakCount,
         targetTime: habit.targetTime,
         conversationHistory: [],
-        logsCount: logsCount // Pass count to AI
+        logsCount: logsCount
       });
+      finalScore = analysis.score;
+      riskExplanation = analysis.explanation;
     }
 
     await db.habits.update(habit.id!, {
-      riskScore,
+      riskScore: finalScore,
       isBreached,
-      riskExplanation
+      riskExplanation,
+      lastRiskAudit: Date.now()
     });
 
-    if (isBreached) {
-      breachedHabits.push({ ...habit, riskScore, isBreached, riskExplanation });
+    if (finalScore > 0.7) {
+      breachedHabits.push({ ...habit, riskScore: finalScore, isBreached, riskExplanation });
     }
   }
 
   // Process Tasks
   for (const task of tasks) {
     const riskScore = await calculateTaskRiskScore(task);
-    const isRisky = riskScore > 0.6;
     let riskExplanation = task.riskExplanation;
+    let finalScore = riskScore;
 
-    if (isRisky && (force || !riskExplanation)) {
-      riskExplanation = await explainRisk({
+    const oneHour = 3600 * 1000;
+    const needsAudit = !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > oneHour);
+
+    if (force || needsAudit) {
+      const analysis = await analyzeRisk({
         habitTitle: task.title,
         riskScore,
         resilienceValue: 0,
         streakCount: 0,
-        targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
+        targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
         conversationHistory: [],
         isTask: true
       });
+      finalScore = analysis.score;
+      riskExplanation = analysis.explanation;
     }
 
     await db.tasks.update(task.id!, {
-      riskScore,
-      riskExplanation
+      riskScore: finalScore,
+      riskExplanation,
+      lastRiskAudit: Date.now()
     });
 
-    if (isRisky) {
-      riskyTasks.push({ ...task, riskScore, riskExplanation });
+    if (finalScore > 0.7) {
+      riskyTasks.push({ ...task, riskScore: finalScore, riskExplanation });
     }
   }
 

@@ -244,10 +244,21 @@ export async function queryThinkingPartner(ctx: ThinkingPartnerContext): Promise
   return { text: getFallbackResponse(ctx), provider: 'fallback' };
 }
 
-export async function explainRisk(ctx: ThinkingPartnerContext): Promise<string> {
-  const prompt = `You are a cold, data-driven AUDITOR. Analyze this ${ctx.isTask ? 'task' : 'habit'} and provide a ONE-SENTENCE diagnostic for why it is 'RISKY' (Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%). 
-Use simple, brutal language. No jargon like "drift" or "volatility" unless you explain it. 
-Data: ${buildHabitContext(ctx)}`;
+export interface RiskAnalysis {
+  score: number;
+  explanation: string;
+}
+
+export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {
+  const prompt = `You are a cold, data-driven AUDITOR. Analyze this ${ctx.isTask ? 'task' : 'habit'} and predict the RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic.
+A score of 1.0 means failure is certain. 0.0 means perfect trajectory.
+Be objective. If they have plenty of time, don't be pessimistic.
+
+Data:
+${buildHabitContext(ctx)}
+${ctx.isTask ? `- Deadline Date: ${ctx.targetTime}` : ''}
+
+Response MUST be a JSON object with keys "score" (number) and "explanation" (string).`;
 
   // 1. Try Gemini
   const apiKey = getGeminiKey();
@@ -260,7 +271,11 @@ Data: ${buildHabitContext(ctx)}`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 60 },
+            generationConfig: { 
+              temperature: 0.7, 
+              maxOutputTokens: 100,
+              responseMimeType: "application/json" 
+            },
           }),
         }
       );
@@ -268,11 +283,14 @@ Data: ${buildHabitContext(ctx)}`;
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (text) {
-          await logDebug('gemini', 'gemini-2.5-flash (explain)', prompt, text);
-          return text;
+          const parsed = JSON.parse(text);
+          await logDebug('gemini', 'gemini-2.5-flash (analyze)', prompt, text);
+          return { score: parsed.score, explanation: parsed.explanation };
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error('Gemini analyze error:', e);
+    }
   }
 
   // 2. Try OpenRouter
@@ -291,7 +309,8 @@ Data: ${buildHabitContext(ctx)}`;
             model,
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.7,
-            max_tokens: 60,
+            max_tokens: 100,
+            response_format: { type: "json_object" }
           }),
         });
         if (res.ok) {

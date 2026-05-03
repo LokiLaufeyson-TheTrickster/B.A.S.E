@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
 import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore } from '@/lib/riskEngine';
-import { hasAnyProvider, explainRisk } from '@/lib/gemini';
+import { hasAnyProvider, analyzeRisk } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
 import TaskCard from '@/components/TaskCard';
@@ -81,25 +81,27 @@ export default function HomePage() {
       const allHabits = await db.habits.toArray();
       const allTasks = await db.tasks.where('status').equals('pending').toArray();
       const aiReady = hasAnyProvider();
+      const oneHour = 3600 * 1000;
 
       // Audit Habits
       for (const habit of allHabits) {
         const { score } = await calculateRiskScore(habit);
-        const shouldExplain = aiReady && score > 0.7 && !habit.riskExplanation;
+        const needsAudit = !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > oneHour);
         
-        if (score !== habit.riskScore || shouldExplain) {
-          let explanation = habit.riskExplanation;
-          if (shouldExplain) {
-            explanation = await explainRisk({
-              habitTitle: habit.title,
-              riskScore: score,
-              resilienceValue: habit.resilienceValue,
-              streakCount: habit.streakCount,
-              targetTime: habit.targetTime,
-              conversationHistory: [],
-            });
-          }
-          await db.habits.update(habit.id!, { riskScore: score, riskExplanation: explanation });
+        if (aiReady && (score > 0 || needsAudit)) {
+          const analysis = await analyzeRisk({
+            habitTitle: habit.title,
+            riskScore: score,
+            resilienceValue: habit.resilienceValue,
+            streakCount: habit.streakCount,
+            targetTime: habit.targetTime,
+            conversationHistory: [],
+          });
+          await db.habits.update(habit.id!, { 
+            riskScore: analysis.score, 
+            riskExplanation: analysis.explanation,
+            lastRiskAudit: Date.now()
+          });
         }
       }
 
@@ -107,22 +109,23 @@ export default function HomePage() {
       for (const task of allTasks) {
         const { calculateTaskRiskScore } = await import('@/lib/riskEngine');
         const score = await calculateTaskRiskScore(task);
-        const shouldExplain = aiReady && score > 0.7 && !task.riskExplanation;
+        const needsAudit = !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > oneHour);
 
-        if (score !== task.riskScore || shouldExplain) {
-          let explanation = task.riskExplanation;
-          if (shouldExplain) {
-            explanation = await explainRisk({
-              habitTitle: task.title,
-              riskScore: score,
-              resilienceValue: 0,
-              streakCount: 0,
-              targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
-              conversationHistory: [],
-              isTask: true
-            });
-          }
-          await db.tasks.update(task.id!, { riskScore: score, riskExplanation: explanation });
+        if (aiReady && (score > 0 || needsAudit)) {
+          const analysis = await analyzeRisk({
+            habitTitle: task.title,
+            riskScore: score,
+            resilienceValue: 0,
+            streakCount: 0,
+            targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
+            conversationHistory: [],
+            isTask: true
+          });
+          await db.tasks.update(task.id!, { 
+            riskScore: analysis.score, 
+            riskExplanation: analysis.explanation,
+            lastRiskAudit: Date.now()
+          });
         }
       }
       
@@ -242,7 +245,7 @@ export default function HomePage() {
     
     const { score: riskScore, logsCount } = await calculateRiskScore(habit);
     
-    const riskExplanation = await explainRisk({
+    const analysis = await analyzeRisk({
       habitTitle: habit.title,
       riskScore,
       resilienceValue: habit.resilienceValue,
@@ -252,7 +255,11 @@ export default function HomePage() {
       logsCount
     });
 
-    await db.habits.update(habit.id, { riskExplanation, riskScore });
+    await db.habits.update(habit.id, { 
+      riskExplanation: analysis.explanation, 
+      riskScore: analysis.score,
+      lastRiskAudit: Date.now()
+    });
     await loadData();
   };
 
@@ -265,17 +272,21 @@ export default function HomePage() {
     if (!task.id) return;
     
     // We already have riskScore from DB or we can recalculate
-    const riskExplanation = await explainRisk({
+    const analysis = await analyzeRisk({
       habitTitle: task.title,
       riskScore: task.riskScore,
       resilienceValue: 0,
       streakCount: 0,
-      targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
+      targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
       conversationHistory: [],
       isTask: true
     });
 
-    await db.tasks.update(task.id, { riskExplanation });
+    await db.tasks.update(task.id, { 
+      riskExplanation: analysis.explanation,
+      riskScore: analysis.score,
+      lastRiskAudit: Date.now()
+    });
     await loadData();
   };
 
