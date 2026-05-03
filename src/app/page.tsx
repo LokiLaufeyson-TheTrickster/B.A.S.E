@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
-import { logHabitCompletion, runMorningRecon, isReconDue } from '@/lib/riskEngine';
+import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore } from '@/lib/riskEngine';
 import { hasAnyProvider, explainRisk } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
@@ -177,6 +177,25 @@ export default function HomePage() {
       streakCount: Math.max(0, habit.streakCount - 1),
       resilienceValue: Math.max(0, habit.resilienceValue - 5)
     });
+    await loadData();
+  };
+
+  const handleExplainHabit = async (habit: Habit) => {
+    if (!habit.id) return;
+    
+    const { score: riskScore, logsCount } = await calculateRiskScore(habit);
+    
+    const riskExplanation = await explainRisk({
+      habitTitle: habit.title,
+      riskScore,
+      resilienceValue: habit.resilienceValue,
+      streakCount: habit.streakCount,
+      targetTime: habit.targetTime,
+      conversationHistory: [],
+      logsCount
+    });
+
+    await db.habits.update(habit.id, { riskExplanation, riskScore });
     await loadData();
   };
 
@@ -417,6 +436,7 @@ export default function HomePage() {
                     onDelete={handleHabitDelete}
                     onEdit={(h) => setEditingItem({ item: h, type: 'habit' })}
                     onUndo={handleUndoHabit}
+                    onExplain={handleExplainHabit}
                   />
                 ))
               )}

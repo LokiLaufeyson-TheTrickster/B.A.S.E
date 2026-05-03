@@ -11,6 +11,7 @@ interface HabitCardProps {
   onDelete: (id: number, clean?: boolean) => void;
   onEdit: (habit: Habit) => void;
   onUndo: (id: number) => void;
+  onExplain: (habit: Habit) => void;
 }
 
 function getRiskLabel(score: number) {
@@ -33,7 +34,7 @@ function formatRecurrence(habit: Habit): string {
   }
 }
 
-export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo }: HabitCardProps) {
+export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo, onExplain }: HabitCardProps) {
   const risk = getRiskLabel(habit.riskScore);
   const isCompleted = habit.lastCompleted
     ? new Date(habit.lastCompleted).toDateString() === new Date().toDateString()
@@ -52,7 +53,7 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo 
             <span>{formatRecurrence(habit)}</span>
             <span className={`item-risk ${risk.className}`}>RISK: {risk.text}</span>
           </div>
-          {habit.isBreached && habit.riskExplanation && (
+          {habit.riskScore > 0 && habit.riskExplanation && (
             <div className="risk-explanation animate-fade-in">
               {habit.riskExplanation}
             </div>
@@ -109,6 +110,20 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo 
           display: 'flex', gap: '6px', padding: '4px 16px 8px',
           marginTop: '-6px', marginBottom: '2px',
         }}>
+          <button
+            onClick={() => { onExplain(habit); setShowActions(false); }}
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--crimson)', padding: '6px 12px',
+              border: '1px solid var(--crimson)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--crimson-glow)',
+              cursor: 'pointer',
+            }}
+          >
+            {habit.riskExplanation ? 'REFRESH RISK' : 'EXPLAIN RISK'}
+          </button>
           <button
             onClick={() => { setShowTP(true); setShowActions(false); }}
             style={{
