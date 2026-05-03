@@ -13,6 +13,12 @@
 import * as chrono from 'chrono-node';
 import type { Habit, Task, RecurrenceRule } from './db';
 
+export interface SentryPart {
+  id: string;
+  type: 'recurrence' | 'priority' | 'tag' | 'date' | 'time';
+  text: string;
+}
+
 interface ParseResult {
   type: 'habit' | 'task';
   data: Partial<Habit> | Partial<Task>;
@@ -90,20 +96,65 @@ function extractTargetTime(input: string): string | null {
 
 // ── Clean Title ────────────────────────────────────────────────────────────────
 
-function cleanTitle(input: string): string {
-  let title = input;
-  // Remove priority tags
-  title = title.replace(PRIORITY_REGEX, '');
-  // Remove all hashtags
-  title = title.replace(/#[a-zA-Z][a-zA-Z0-9]*/g, '');
-  // Remove recurrence keywords
-  RECURRENCE_PATTERNS.forEach(({ pattern }) => {
-    title = title.replace(pattern, '');
+export function extractSentryParts(input: string): SentryPart[] {
+  const parts: SentryPart[] = [];
+  const trimmed = input.trim();
+
+  // Priority
+  const pMatch = trimmed.match(PRIORITY_REGEX);
+  if (pMatch) {
+    parts.push({ id: `p-${pMatch[1]}`, type: 'priority', text: pMatch[0] });
+  }
+
+  // Tags
+  let tMatch;
+  const tRegex = /#([a-zA-Z][a-zA-Z0-9]*)/g;
+  while ((tMatch = tRegex.exec(trimmed)) !== null) {
+    if (!tMatch[1].match(/^p[1-4]$/i)) {
+      parts.push({ id: `t-${tMatch[1]}`, type: 'tag', text: tMatch[0] });
+    }
+  }
+
+  // Recurrence
+  RECURRENCE_PATTERNS.forEach(({ pattern }, i) => {
+    const match = trimmed.match(pattern);
+    if (match) {
+      parts.push({ id: `r-${i}`, type: 'recurrence', text: match[0] });
+    }
   });
-  // Remove time patterns
-  title = title.replace(/\b\d{1,2}:?\d{0,2}\s*(am|pm)\b/gi, '');
-  // Remove chrono-parseable date phrases
-  title = title.replace(/\b(at|by|on|before|after|tomorrow|today|tonight|next\s+\w+)\b/gi, '');
+
+  // Time
+  const timeMatch = trimmed.match(/\b\d{1,2}:?\d{0,2}\s*(am|pm)\b/gi);
+  if (timeMatch) {
+    timeMatch.forEach((m, i) => {
+      parts.push({ id: `tm-${i}`, type: 'time', text: m });
+    });
+  }
+
+  // Date phrases (tomorrow, today, friday, etc.)
+  const chronoParsed = chrono.parse(trimmed, new Date(), { forwardDate: true });
+  chronoParsed.forEach((p, i) => {
+    // Only add if it's not already covered by time-only regex (avoid duplicates)
+    if (!p.text.match(/^\d{1,2}:?\d{0,2}\s*(am|pm)$/i)) {
+      parts.push({ id: `d-${i}`, type: 'date', text: p.text });
+    }
+  });
+
+  return parts;
+}
+
+function cleanTitle(input: string, ignoredParts: string[] = []): string {
+  let title = input;
+  const allParts = extractSentryParts(input);
+  
+  allParts.forEach(part => {
+    if (!ignoredParts.includes(part.id)) {
+      // Escape for regex and remove only that instance
+      const escaped = part.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      title = title.replace(new RegExp(escaped, 'i'), '');
+    }
+  });
+
   // Clean up whitespace
   title = title.replace(/\s+/g, ' ').trim();
   return title;
@@ -111,39 +162,37 @@ function cleanTitle(input: string): string {
 
 // ── Main Parser ────────────────────────────────────────────────────────────────
 
-export function parseSentryInput(input: string): ParseResult {
+export function parseSentryInput(input: string, ignoredParts: string[] = []): ParseResult {
   const trimmed = input.trim();
+  const allParts = extractSentryParts(input).filter(p => !ignoredParts.includes(p.id));
 
   // Extract priority (default: 3)
-  const priorityMatch = trimmed.match(PRIORITY_REGEX);
-  const priority = priorityMatch ? (parseInt(priorityMatch[1]) as 1 | 2 | 3 | 4) : 3;
+  const priorityPart = allParts.find(p => p.type === 'priority');
+  const priority = priorityPart ? (parseInt(priorityPart.text.replace('#p', '')) as 1 | 2 | 3 | 4) : 3;
 
-  // Extract tags (exclude priority tag)
-  const tags: string[] = [];
-  let tagMatch;
-  const tagRegex = /#([a-zA-Z][a-zA-Z0-9]*)/g;
-  while ((tagMatch = tagRegex.exec(trimmed)) !== null) {
-    const tag = tagMatch[1].toLowerCase();
-    if (!tag.match(/^p[1-4]$/i)) {
-      tags.push(tag);
-    }
-  }
+  // Extract tags
+  const tags = allParts.filter(p => p.type === 'tag').map(p => p.text.replace('#', '').toLowerCase());
 
   // Check for recurrence → Habit
   let recurrence: RecurrenceRule | null = null;
-  for (const { pattern, getRule } of RECURRENCE_PATTERNS) {
-    const match = trimmed.match(pattern);
-    if (match) {
-      recurrence = getRule(match);
-      break;
+  const recurrencePart = allParts.find(p => p.type === 'recurrence');
+  if (recurrencePart) {
+    for (const { pattern, getRule } of RECURRENCE_PATTERNS) {
+      const match = recurrencePart.text.match(pattern);
+      if (match) {
+        recurrence = getRule(match);
+        break;
+      }
     }
   }
 
-  const title = cleanTitle(trimmed);
+  const title = cleanTitle(trimmed, ignoredParts);
 
   if (recurrence) {
     // It's a HABIT
-    const targetTime = extractTargetTime(trimmed) || '08:00';
+    // Find time part if not ignored
+    const timePart = allParts.find(p => p.type === 'time');
+    const targetTime = timePart ? extractTargetTime(timePart.text) || '08:00' : '08:00';
     return {
       type: 'habit',
       data: {
@@ -162,9 +211,11 @@ export function parseSentryInput(input: string): ParseResult {
     };
   } else {
     // It's a TASK — always resolve dates to the future
-    const chronoParsed = chrono.parse(trimmed, new Date(), { forwardDate: true });
+    const datePart = allParts.find(p => p.type === 'date' || p.type === 'time');
     let dueDate: number | null = null;
-    if (chronoParsed.length > 0) {
+    if (datePart) {
+      const chronoParsed = chrono.parse(datePart.text, new Date(), { forwardDate: true });
+      if (chronoParsed.length > 0) {
       const start = chronoParsed[0].start;
       // If time is not specified, default to end of day (23:59:59)
       if (!start.isCertain('hour')) {
@@ -173,6 +224,7 @@ export function parseSentryInput(input: string): ParseResult {
         (start as any).assign('second', 59);
       }
       dueDate = start.date().getTime();
+      }
     }
 
     return {
