@@ -10,7 +10,7 @@ import {
   isGeminiEnabled, setGeminiEnabled,
 } from '@/lib/gemini';
 import { db } from '@/lib/db';
-import { extractJSON } from '@/lib/utils';
+import { extractJSON, normalizeBatchResponse } from '@/lib/utils';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -299,7 +299,7 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
                       const extracted = extractJSON(log.response);
                       if (!extracted) return null;
                       
-                      const items = Array.isArray(extracted) ? extracted : [extracted];
+                      const items = normalizeBatchResponse(extracted);
                       
                       return (
                         <div style={{ borderTop: '1px dashed var(--gray-300)', paddingTop: '6px', marginTop: '6px' }}>

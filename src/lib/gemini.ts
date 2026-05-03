@@ -14,7 +14,7 @@ const OR_MODELS = 'BASE_OR_MODELS';
 const VERIFIED_KEY = 'BASE_VERIFIED_PROVIDERS';
 const GEMINI_ENABLED = 'BASE_GEMINI_ENABLED';
 import { db } from './db';
-import { extractJSON } from './utils';
+import { extractJSON, normalizeBatchResponse } from './utils';
 
 export function getGeminiKey(): string { return (typeof window !== 'undefined' && localStorage.getItem(GEMINI_KEY)) || ''; }
 export function setGeminiKey(k: string) { localStorage.setItem(GEMINI_KEY, k); clearVerified('gemini'); }
@@ -303,9 +303,10 @@ The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (text) {
           const parsed = extractJSON(text);
-          if (Array.isArray(parsed)) {
+          const items = normalizeBatchResponse(parsed);
+          if (items.length > 0) {
             await logDebug('gemini', 'gemini-2.5-flash (batch)', prompt, text);
-            return parsed.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
+            return items.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
           }
         }
       }
@@ -339,10 +340,10 @@ The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
           const text = data.choices?.[0]?.message?.content?.trim();
           if (text) {
             const parsed = extractJSON(text);
-            const list = Array.isArray(parsed) ? parsed : (parsed.items || parsed.results || []);
-            if (Array.isArray(list)) {
+            const items = normalizeBatchResponse(parsed);
+            if (items.length > 0) {
               await logDebug('openrouter', `${model} (batch)`, prompt, text);
-              return list.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
+              return items.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
             }
           }
         }
