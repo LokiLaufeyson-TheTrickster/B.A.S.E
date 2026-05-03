@@ -326,9 +326,9 @@ Response MUST be a JSON object with keys "score" (number) and "explanation" (str
   }
 
   // 3. Fallback
-  if (ctx.riskScore > 0.8) return "You're consistently missing your target. Your word is currently worthless.";
-  if (ctx.resilienceValue < 30) return "Your discipline has collapsed. You are operating on pure excuse-mode.";
-  return "Statistical failure: you are deviating from your own promised schedule.";
+  if (ctx.riskScore > 0.8) return { score: ctx.riskScore, explanation: "You're consistently missing your target. Your word is currently worthless." };
+  if (ctx.resilienceValue < 30) return { score: ctx.riskScore, explanation: "Your discipline has collapsed. You are operating on pure excuse-mode." };
+  return { score: ctx.riskScore, explanation: "Statistical failure: you are deviating from your own promised schedule." };
 }
 
 // ── Connection Testing ─────────────────────────────────────────────────────────
