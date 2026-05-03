@@ -216,9 +216,14 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
 
   if (breachedHabits.length > 0 || riskyTasks.length > 0) {
     const totalCount = breachedHabits.length + riskyTasks.length;
+    const details = [
+      ...breachedHabits.map(h => `[!] ${h.title}: ${h.riskExplanation}`),
+      ...riskyTasks.map(t => `[!] ${t.title}: ${t.riskExplanation}`)
+    ].join('\n');
+
     await sendPushNotification(
-      `SURVEILLANCE ALERT: ${totalCount} HIGH-RISK VECTORS`,
-      `Critical schedule drift detected. Auditor intervention required.`
+      `AUDIT: ${totalCount} HIGH-RISK VECTORS`,
+      details
     );
   }
 

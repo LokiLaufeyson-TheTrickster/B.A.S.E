@@ -256,6 +256,14 @@ export interface RiskAnalysis {
 export async function analyzeRiskBatch(items: ThinkingPartnerContext[]): Promise<RiskAnalysis[]> {
   if (items.length === 0) return [];
   
+  // Limit batch size for reliability
+  const MAX_BATCH = 5;
+  if (items.length > MAX_BATCH) {
+    const chunk1 = await analyzeRiskBatch(items.slice(0, MAX_BATCH));
+    const chunk2 = await analyzeRiskBatch(items.slice(MAX_BATCH));
+    return [...chunk1, ...chunk2];
+  }
+
   const itemsText = items.map((ctx, i) => `
 ITEM_${i}:
 - Type: ${ctx.isTask ? 'Task' : 'Habit'}
@@ -276,7 +284,8 @@ STABILITY GUIDELINES:
 Items to analyze:
 ${itemsText}
 
-Response MUST be a JSON array of objects, each with keys "score" (number) and "explanation" (string). 
+Response MUST be a JSON array of EXACTLY ${items.length} objects. Do NOT return a single object. 
+Example Format: [ {"score": 0.1, "explanation": "..."}, {"score": 0.5, "explanation": "..."} ]
 The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
 
   // 1. Try Gemini
