@@ -168,9 +168,9 @@ export function parseSentryInput(input: string): ParseResult {
       const start = chronoParsed[0].start;
       // If time is not specified, default to end of day (23:59:59)
       if (!start.isCertain('hour')) {
-        start.assign('hour', 23);
-        start.assign('minute', 59);
-        start.assign('second', 59);
+        (start as any).assign('hour', 23);
+        (start as any).assign('minute', 59);
+        (start as any).assign('second', 59);
       }
       dueDate = start.date().getTime();
     }
