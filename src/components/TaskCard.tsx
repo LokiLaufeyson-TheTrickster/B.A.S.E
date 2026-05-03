@@ -12,9 +12,10 @@ interface TaskCardProps {
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
   onUndo: (id: number) => void;
+  onExplain: (task: Task) => void;
 }
 
-export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, onUndo }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, onUndo, onExplain }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const date = task.dueDate ? new Date(task.dueDate) : null;
@@ -56,11 +57,13 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
             {isFailed ? 'FAILED' : isOverdue ? 'OVERDUE: ' : ''}{!isFailed && dueStr}
           </span>
           <span>P{task.priority}</span>
-          {task.riskScore > 0.6 && !isCompleted && !isFailed && (
-            <span className="item-risk high">RISK: {(task.riskScore * 100).toFixed(0)}%</span>
+          {task.riskScore > 0 && !isCompleted && !isFailed && (
+            <span className={`item-risk ${task.riskScore > 0.6 ? 'high' : 'medium'}`}>
+              RISK: {(task.riskScore * 100).toFixed(0)}%
+            </span>
           )}
         </div>
-        {task.riskScore > 0.6 && task.riskExplanation && !isCompleted && !isFailed && (
+        {task.riskScore > 0 && task.riskExplanation && !isCompleted && !isFailed && (
           <div className="risk-explanation animate-fade-in">
             {task.riskExplanation}
           </div>
@@ -90,7 +93,7 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
       ) : (
         <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
           <button
-            onClick={() => setShowTP(true)}
+            onClick={() => onExplain(task)}
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
@@ -102,7 +105,7 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
               transition: 'var(--transition)',
             }}
           >
-            EXPLAIN RISK
+            {task.riskExplanation ? 'REFRESH RISK' : 'EXPLAIN RISK'}
           </button>
           <button
             onClick={() => onEdit(task)}

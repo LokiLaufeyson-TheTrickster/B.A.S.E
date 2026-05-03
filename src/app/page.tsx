@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
 import { logHabitCompletion, runMorningRecon, isReconDue } from '@/lib/riskEngine';
-import { hasAnyProvider } from '@/lib/gemini';
+import { hasAnyProvider, explainRisk } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
 import TaskCard from '@/components/TaskCard';
@@ -182,6 +182,24 @@ export default function HomePage() {
 
   const handleUndoTask = async (id: number) => {
     await db.tasks.update(id, { status: 'pending', completedAt: null });
+    await loadData();
+  };
+
+  const handleExplainTask = async (task: Task) => {
+    if (!task.id) return;
+    
+    // We already have riskScore from DB or we can recalculate
+    const riskExplanation = await explainRisk({
+      habitTitle: task.title,
+      riskScore: task.riskScore,
+      resilienceValue: 0,
+      streakCount: 0,
+      targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
+      conversationHistory: [],
+      isTask: true
+    });
+
+    await db.tasks.update(task.id, { riskExplanation });
     await loadData();
   };
 
@@ -438,6 +456,7 @@ export default function HomePage() {
                     onDelete={handleTaskDelete}
                     onEdit={(t) => setEditingItem({ item: t, type: 'task' })}
                     onUndo={handleUndoTask}
+                    onExplain={handleExplainTask}
                   />
                 ))
               )}
