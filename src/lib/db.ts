@@ -15,6 +15,7 @@ export interface Habit {
   createdAt: number;
   isBreached: boolean;
   lastCompleted: number | null;
+  riskExplanation?: string;
 }
 
 export interface RecurrenceRule {
@@ -32,6 +33,8 @@ export interface Task {
   status: 'pending' | 'completed' | 'failed';
   createdAt: number;
   completedAt: number | null;
+  riskScore: number;
+  riskExplanation?: string;
 }
 
 export interface DojoTrack {
@@ -83,9 +86,9 @@ class BaseDB extends Dexie {
       identity: '++id, vector, timestamp',
     });
 
-    this.version(4).stores({
-      habits: '++id, title, priority, *tags, targetTime, recurrence, riskScore, resilienceValue',
-      tasks: '++id, title, priority, *tags, dueDate, status',
+    this.version(5).stores({
+      habits: '++id, title, priority, *tags, targetTime, recurrence, riskScore, resilienceValue, isBreached',
+      tasks: '++id, title, priority, *tags, dueDate, status, riskScore',
       dojo: '++id, blob, title, category, icon',
       logs: '++id, habitId, timestamp, jitterValue, riskSnapshot',
       identity: '++id, vector, timestamp',

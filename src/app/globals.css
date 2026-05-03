@@ -251,6 +251,19 @@ input:focus, textarea:focus { border-color: var(--crimson); box-shadow: 0 0 0 1p
 .item-risk.medium { color: var(--amber); }
 .item-risk.low { color: var(--green); }
 
+.risk-explanation {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 6px;
+  line-height: 1.4;
+  font-style: italic;
+  border-left: 2px solid var(--crimson);
+  padding-left: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
 .item-stats {
   display: flex; gap: 16px; align-items: center;
   font-family: var(--font-mono); font-size: 11px;

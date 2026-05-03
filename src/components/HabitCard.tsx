@@ -50,6 +50,11 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
             <span>{formatRecurrence(habit)}</span>
             <span className={`item-risk ${risk.className}`}>RISK: {risk.text}</span>
           </div>
+          {habit.isBreached && habit.riskExplanation && (
+            <div className="risk-explanation animate-fade-in">
+              {habit.riskExplanation}
+            </div>
+          )}
           {habit.tags.length > 0 && (
             <div className="item-tags" style={{ marginTop: '6px' }}>
               {habit.tags.map((tag, i) => (

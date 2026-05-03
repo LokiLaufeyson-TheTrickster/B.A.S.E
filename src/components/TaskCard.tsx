@@ -51,7 +51,15 @@ export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCar
             {isFailed ? 'FAILED' : isOverdue ? 'OVERDUE: ' : ''}{!isFailed && dueStr}
           </span>
           <span>P{task.priority}</span>
+          {task.riskScore > 0.6 && !isCompleted && !isFailed && (
+            <span className="item-risk high">RISK: {(task.riskScore * 100).toFixed(0)}%</span>
+          )}
         </div>
+        {task.riskScore > 0.6 && task.riskExplanation && !isCompleted && !isFailed && (
+          <div className="risk-explanation animate-fade-in">
+            {task.riskExplanation}
+          </div>
+        )}
         {task.tags.length > 0 && (
           <div className="item-tags" style={{ marginTop: '6px' }}>
             {task.tags.map((tag, i) => (

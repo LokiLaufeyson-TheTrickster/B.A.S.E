@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
-import { logHabitCompletion, runMorningRecon } from '@/lib/riskEngine';
+import { logHabitCompletion, runMorningRecon, isReconDue } from '@/lib/riskEngine';
 import { hasAnyProvider } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
@@ -10,6 +10,7 @@ import TaskCard from '@/components/TaskCard';
 import DojoPanel from '@/components/DojoPanel';
 import IdentityPanel from '@/components/IdentityPanel';
 import BreachOverlay from '@/components/BreachOverlay';
+import MorningReport from '@/components/MorningReport';
 import SettingsModal from '@/components/SettingsModal';
 import Marquee from '@/components/Marquee';
 
@@ -22,6 +23,9 @@ export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [breachedHabits, setBreachedHabits] = useState<Habit[]>([]);
   const [showBreach, setShowBreach] = useState(false);
+  const [showMorningReport, setShowMorningReport] = useState(false);
+  const [riskyTasks, setRiskyTasks] = useState<Task[]>([]);
+  const [isManualRecon, setIsManualRecon] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [aiActive, setAiActive] = useState(false);
@@ -51,7 +55,19 @@ export default function HomePage() {
 
   useEffect(() => {
     loadData();
-    runMorningRecon().then(() => loadData());
+    
+    // Auto-trigger Morning Recon if it's past 6AM and hasn't run today
+    if (isReconDue()) {
+      runMorningRecon().then(({ habits: h, tasks: t }) => {
+        if (h.length > 0 || t.length > 0) {
+          setBreachedHabits(h);
+          setRiskyTasks(t);
+          setShowMorningReport(true);
+        }
+        loadData();
+      });
+    }
+
     setAiActive(hasAnyProvider());
   }, [loadData]);
 
@@ -138,6 +154,15 @@ export default function HomePage() {
   const handleBreachDismiss = () => {
     setShowBreach(false);
     setIsLocked(false);
+  };
+
+  const handleManualRecon = async () => {
+    setIsManualRecon(true);
+    const { habits: h, tasks: t } = await runMorningRecon(true);
+    setBreachedHabits(h);
+    setRiskyTasks(t);
+    setShowMorningReport(true);
+    await loadData();
   };
 
   const toggleTag = (tag: string) => {
@@ -267,6 +292,18 @@ export default function HomePage() {
             </span>
           </div>
           <button
+            onClick={handleManualRecon}
+            title="Run Morning Recon — AI Audit"
+            style={{
+              fontSize: '14px', padding: '4px',
+              color: 'var(--amber)',
+              transition: 'var(--transition)',
+              marginLeft: '4px',
+            }}
+          >
+            🛰
+          </button>
+          <button
             onClick={() => setShowSettings(true)}
             title="Settings — AI Providers"
             style={{
@@ -369,8 +406,20 @@ export default function HomePage() {
         {activeTab === 'identity' && <IdentityPanel />}
       </main>
 
-      {/* Breach Overlay */}
-      {showBreach && (
+      {/* Morning Recon Report */}
+      {showMorningReport && (
+        <MorningReport 
+          habits={breachedHabits} 
+          tasks={riskyTasks} 
+          onDismiss={() => { setShowMorningReport(false); setIsManualRecon(false); }}
+          onCompleteHabit={handleHabitComplete}
+          onCompleteTask={handleTaskComplete}
+          manual={isManualRecon}
+        />
+      )}
+
+      {/* Breach Overlay (Manual/Persistence) */}
+      {showBreach && !showMorningReport && (
         <BreachOverlay habits={breachedHabits} onComplete={handleHabitComplete} onDismiss={handleBreachDismiss} />
       )}
 

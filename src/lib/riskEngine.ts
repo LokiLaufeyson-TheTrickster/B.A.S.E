@@ -10,7 +10,8 @@
  *   - Threshold: If Rs > 0.75, habit enters BREACH MODE
  */
 
-import { db, type Habit, type HabitLog } from './db';
+import { db, type Habit, type HabitLog, type Task } from './db';
+import { explainRisk } from './gemini';
 
 const BREACH_THRESHOLD = 0.75;
 const DRIFT_THRESHOLD_MINUTES = 30; // T_threshold
@@ -31,6 +32,12 @@ function timeToMinutes(timeStr: string): number {
 
 function timestampToMinutes(ts: number): number {
   const d = new Date(ts);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function getDueDateMinutes(dueDate: number | null): number {
+  if (!dueDate) return 1440; // End of day
+  const d = new Date(dueDate);
   return d.getHours() * 60 + d.getMinutes();
 }
 
@@ -90,37 +97,108 @@ export async function calculateRiskScore(habit: Habit): Promise<number> {
   return Math.min(Math.max(Rs, 0), 1);
 }
 
-export async function runMorningRecon(): Promise<Habit[]> {
+export async function calculateTaskRiskScore(task: Task): Promise<number> {
+  const now = Date.now();
+  if (!task.dueDate) return 0.2 * (5 - task.priority); // Low risk if no due date, priority based
+
+  const timeLeft = task.dueDate - now;
+  const hoursLeft = timeLeft / (1000 * 60 * 60);
+
+  if (timeLeft < 0) return 1.0; // Overdue is critical
+  if (hoursLeft < 4) return 0.9; // Due soon is high risk
+  if (hoursLeft < 12) return 0.7; // Same day is moderate risk
+
+  return Math.max(0.1, (5 - task.priority) * 0.1);
+}
+
+export async function runMorningRecon(force = false): Promise<{ habits: Habit[], tasks: Task[] }> {
   const habits = await db.habits.toArray();
+  const tasks = await db.tasks.where('status').equals('pending').toArray();
   const breachedHabits: Habit[] = [];
+  const riskyTasks: Task[] = [];
   const todayStr = new Date().toDateString();
 
+  // Process Habits
   for (const habit of habits) {
-    // Skip habits already completed today
     const completedToday = habit.lastCompleted
       ? new Date(habit.lastCompleted).toDateString() === todayStr
       : false;
 
     if (completedToday) {
-      // Already done today — clear breach
-      await db.habits.update(habit.id!, { isBreached: false });
+      await db.habits.update(habit.id!, { isBreached: false, riskExplanation: undefined });
       continue;
     }
 
     const riskScore = await calculateRiskScore(habit);
     const isBreached = riskScore > BREACH_THRESHOLD;
+    let riskExplanation = habit.riskExplanation;
+
+    if (isBreached && (force || !riskExplanation)) {
+      riskExplanation = await explainRisk({
+        habitTitle: habit.title,
+        riskScore,
+        resilienceValue: habit.resilienceValue,
+        streakCount: habit.streakCount,
+        targetTime: habit.targetTime,
+        conversationHistory: []
+      });
+    }
 
     await db.habits.update(habit.id!, {
       riskScore,
       isBreached,
+      riskExplanation
     });
 
     if (isBreached) {
-      breachedHabits.push({ ...habit, riskScore, isBreached });
+      breachedHabits.push({ ...habit, riskScore, isBreached, riskExplanation });
     }
   }
 
-  return breachedHabits;
+  // Process Tasks
+  for (const task of tasks) {
+    const riskScore = await calculateTaskRiskScore(task);
+    const isRisky = riskScore > 0.6;
+    let riskExplanation = task.riskExplanation;
+
+    if (isRisky && (force || !riskExplanation)) {
+      riskExplanation = await explainRisk({
+        habitTitle: task.title,
+        riskScore,
+        resilienceValue: 0,
+        streakCount: 0,
+        targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
+        conversationHistory: [],
+        isTask: true
+      });
+    }
+
+    await db.tasks.update(task.id!, {
+      riskScore,
+      riskExplanation
+    });
+
+    if (isRisky) {
+      riskyTasks.push({ ...task, riskScore, riskExplanation });
+    }
+  }
+
+  // Mark recon as run for today
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('BASE_LAST_RECON', todayStr);
+  }
+
+  return { habits: breachedHabits, tasks: riskyTasks };
+}
+
+export function isReconDue(): boolean {
+  if (typeof window === 'undefined') return false;
+  const lastRecon = localStorage.getItem('BASE_LAST_RECON');
+  const today = new Date().toDateString();
+  const currentHour = new Date().getHours();
+
+  // If not run today AND it's after 6 AM
+  return lastRecon !== today && currentHour >= 6;
 }
 
 export async function logHabitCompletion(habitId: number): Promise<void> {

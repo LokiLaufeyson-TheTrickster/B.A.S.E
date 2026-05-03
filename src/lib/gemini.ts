@@ -75,9 +75,17 @@ export interface ThinkingPartnerContext {
   streakCount: number;
   targetTime: string;
   conversationHistory: { role: 'user' | 'system'; content: string }[];
+  isTask?: boolean;
 }
 
 function buildHabitContext(ctx: ThinkingPartnerContext): string {
+  if (ctx.isTask) {
+    return `CURRENT TASK DATA:
+- Task: "${ctx.habitTitle}"
+- Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
+- Target Time: ${ctx.targetTime}
+- Current Time: ${new Date().toLocaleTimeString()}`;
+  }
   return `CURRENT HABIT DATA:
 - Habit: "${ctx.habitTitle}"
 - Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
@@ -203,6 +211,39 @@ export async function queryThinkingPartner(ctx: ThinkingPartnerContext): Promise
 
   // 3. Fallback to pattern matching (all APIs failed/rate-limited)
   return { text: getFallbackResponse(ctx), provider: 'fallback' };
+}
+
+export async function explainRisk(ctx: ThinkingPartnerContext): Promise<string> {
+  const apiKey = getGeminiKey();
+  if (!apiKey || !isGeminiEnabled()) {
+    // Basic fallback explanation if AI is off
+    if (ctx.riskScore > 0.8) return "Critical drift detected in execution pattern.";
+    if (ctx.resilienceValue < 30) return "Identity erosion: consecutive failures have decimated resilience.";
+    return "Statistical volatility in performance metrics.";
+  }
+
+  const prompt = `You are a cold, data-driven auditor. Analyze this ${ctx.isTask ? 'task' : 'habit'} and provide a ONE-SENTENCE explanation for why it is considered 'RISKY' (Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%). 
+Focus on the variance, volatility, or overdue status. No comfort. Just the diagnostic truth.
+Data: ${buildHabitContext(ctx)}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.5, maxOutputTokens: 60 },
+        }),
+      }
+    );
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Unstable execution detected.";
+  } catch {
+    return "Data-driven breach: performance variance exceeds safe threshold.";
+  }
 }
 
 // ── Connection Testing ─────────────────────────────────────────────────────────
