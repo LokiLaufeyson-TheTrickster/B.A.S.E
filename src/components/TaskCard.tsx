@@ -9,9 +9,10 @@ interface TaskCardProps {
   onComplete: (id: number) => void;
   onFail: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit: (task: Task) => void;
 }
 
-export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const date = task.dueDate ? new Date(task.dueDate) : null;
@@ -71,7 +72,21 @@ export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCar
 
       {/* Actions */}
       {!isCompleted && !isFailed && (
-        <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+          <button
+            onClick={() => onEdit(task)}
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--amber)', padding: '6px 10px',
+              border: '1px solid var(--amber)',
+              borderRadius: 'var(--radius)',
+              background: 'rgba(255, 191, 0, 0.05)',
+              cursor: 'pointer',
+              transition: 'var(--transition)',
+            }}
+          >
+            EDIT
+          </button>
           <button
             onClick={() => task.id && onFail(task.id)}
             title="Mark as failed"
@@ -90,8 +105,6 @@ export default function TaskCard({ task, onComplete, onFail, onDelete }: TaskCar
           <button
             onClick={() => {
               if (task.id) {
-                // Pass a specific flag or use a different handler
-                // For now, let's assume we add an onDelete prop
                 onDelete && onDelete(task.id);
               }
             }}

@@ -59,8 +59,8 @@ export async function calculateRiskScore(habit: Habit): Promise<number> {
     .sortBy('timestamp');
 
   if (recentLogs.length === 0) {
-    // No data → default moderate risk
-    return 0.5;
+    // New habit or no recent data → No risk yet.
+    return 0;
   }
 
   const targetMinutes = timeToMinutes(habit.targetTime);
@@ -141,7 +141,8 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
         resilienceValue: habit.resilienceValue,
         streakCount: habit.streakCount,
         targetTime: habit.targetTime,
-        conversationHistory: []
+        conversationHistory: [],
+        logsCount: recentLogs.length // Pass count to AI
       });
     }
 
@@ -191,9 +192,14 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
 
   if (breachedHabits.length > 0 || riskyTasks.length > 0) {
     const total = breachedHabits.length + riskyTasks.length;
+    const descriptions = [
+      ...breachedHabits.map(h => `HABIT: ${h.title} - ${h.riskExplanation}`),
+      ...riskyTasks.map(t => `TASK: ${t.title} - ${t.riskExplanation}`)
+    ].join('\n\n');
+
     await sendPushNotification(
-      'MORNING RECON: RISKY VECTORS',
-      `${total} breaches/risks detected. Your identity is under surveillance.`,
+      `MORNING RECON: ${total} VECTORS`,
+      descriptions,
       4
     );
   }

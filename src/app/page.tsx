@@ -12,6 +12,7 @@ import IdentityPanel from '@/components/IdentityPanel';
 import BreachOverlay from '@/components/BreachOverlay';
 import MorningReport from '@/components/MorningReport';
 import SettingsModal from '@/components/SettingsModal';
+import EditModal from '@/components/EditModal';
 import Marquee from '@/components/Marquee';
 
 type TabType = 'habits' | 'tasks' | 'dojo' | 'identity';
@@ -30,6 +31,7 @@ export default function HomePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [aiActive, setAiActive] = useState(false);
   const [breachAcknowledged, setBreachAcknowledged] = useState(false);
+  const [editingItem, setEditingItem] = useState<{ item: Habit | Task, type: 'habit' | 'task' } | null>(null);
 
   // ── Filter State ─────────────────────────────────────────────────────────────
   const [filterPriority, setFilterPriority] = useState<number | null>(null);
@@ -152,6 +154,15 @@ export default function HomePage() {
 
   const handleTaskDelete = async (id: number) => {
     await db.tasks.delete(id);
+    await loadData();
+  };
+
+  const handleUpdateItem = async (updated: any) => {
+    if (editingItem?.type === 'habit') {
+      await db.habits.put(updated);
+    } else {
+      await db.tasks.put(updated);
+    }
     await loadData();
   };
 
@@ -329,9 +340,13 @@ export default function HomePage() {
         <button className={`nav-tab ${activeTab === 'habits' ? 'active' : ''} ${breachedHabits.length > 0 ? 'breached' : ''}`}
           onClick={() => setActiveTab('habits')}>HABITS</button>
         <button className={`nav-tab ${activeTab === 'tasks' ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-          onClick={() => !isLocked && setActiveTab('tasks')}>TASKS</button>
+          onClick={() => !isLocked && setActiveTab('tasks')}>
+          {isLocked ? '🔒 TASKS' : 'TASKS'}
+        </button>
         <button className={`nav-tab ${activeTab === 'dojo' ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-          onClick={() => !isLocked && setActiveTab('dojo')}>DOJO</button>
+          onClick={() => !isLocked && setActiveTab('dojo')}>
+          {isLocked ? '🔒 DOJO' : 'DOJO'}
+        </button>
         <button className={`nav-tab ${activeTab === 'identity' ? 'active' : ''}`}
           onClick={() => setActiveTab('identity')}>IDENTITY</button>
       </nav>
@@ -365,7 +380,10 @@ export default function HomePage() {
               ) : (
                 filteredHabits.map((habit) => (
                   <HabitCard key={habit.id} habit={habit}
-                    onComplete={handleHabitComplete} onDelete={handleHabitDelete} />
+                    onComplete={handleHabitComplete} 
+                    onDelete={handleHabitDelete}
+                    onEdit={(h) => setEditingItem({ item: h, type: 'habit' })}
+                  />
                 ))
               )}
             </div>
@@ -399,7 +417,11 @@ export default function HomePage() {
               ) : (
                 filteredTasks.map((task) => (
                   <TaskCard key={task.id} task={task}
-                    onComplete={handleTaskComplete} onFail={handleTaskFail} onDelete={handleTaskDelete} />
+                    onComplete={handleTaskComplete} 
+                    onFail={handleTaskFail} 
+                    onDelete={handleTaskDelete}
+                    onEdit={(t) => setEditingItem({ item: t, type: 'task' })}
+                  />
                 ))
               )}
             </div>
@@ -432,6 +454,16 @@ export default function HomePage() {
         <SettingsModal
           onClose={() => { setShowSettings(false); setAiActive(hasAnyProvider()); }}
           onPurge={loadData}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editingItem && (
+        <EditModal 
+          item={editingItem.item}
+          type={editingItem.type}
+          onSave={handleUpdateItem}
+          onClose={() => setEditingItem(null)}
         />
       )}
 

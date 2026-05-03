@@ -76,6 +76,7 @@ export interface ThinkingPartnerContext {
   targetTime: string;
   conversationHistory: { role: 'user' | 'system'; content: string }[];
   isTask?: boolean;
+  logsCount?: number;
 }
 
 function buildHabitContext(ctx: ThinkingPartnerContext): string {
@@ -92,6 +93,7 @@ function buildHabitContext(ctx: ThinkingPartnerContext): string {
 - Resilience: ${ctx.resilienceValue}%
 - Current Streak: ${ctx.streakCount} days
 - Target Time: ${ctx.targetTime}
+- Historical Logs Count: ${ctx.logsCount ?? 0}
 - Current Time: ${new Date().toLocaleTimeString()}`;
 }
 

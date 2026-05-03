@@ -9,6 +9,7 @@ interface HabitCardProps {
   habit: Habit;
   onComplete: (id: number) => void;
   onDelete: (id: number, clean?: boolean) => void;
+  onEdit: (habit: Habit) => void;
 }
 
 function getRiskLabel(score: number) {
@@ -108,6 +109,20 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
             }}
           >
             CONFRONT
+          </button>
+          <button
+            onClick={() => { onEdit(habit); setShowActions(false); }}
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--amber)', padding: '6px 12px',
+              border: '1px solid var(--amber)',
+              borderRadius: 'var(--radius)',
+              background: 'rgba(255, 191, 0, 0.05)',
+              cursor: 'pointer',
+            }}
+          >
+            EDIT
           </button>
           <button
             onClick={() => { if (habit.id) onDelete(habit.id); setShowActions(false); }}
