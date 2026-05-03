@@ -11,7 +11,7 @@
  */
 
 import { db, type Habit, type HabitLog, type Task } from './db';
-import { analyzeRisk } from './gemini';
+import { analyzeRiskBatch, analyzeRisk, type ThinkingPartnerContext } from './gemini';
 import { sendPushNotification } from './ntfy';
 
 const BREACH_THRESHOLD = 0.75;
@@ -126,103 +126,95 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
   const tasks = await db.tasks.where('status').equals('pending').toArray();
   const breachedHabits: Habit[] = [];
   const riskyTasks: Task[] = [];
-  const todayStr = new Date().toDateString();
+  
+  const twentyMins = 20 * 60 * 1000;
+  const auditQueue: { item: Habit | Task, ctx: ThinkingPartnerContext, isTask: boolean }[] = [];
 
-  // Process Habits
+  // 1. Filter Habits
   for (const habit of habits) {
-    const completedToday = habit.lastCompleted
-      ? new Date(habit.lastCompleted).toDateString() === todayStr
-      : false;
-
-    if (completedToday) {
-      await db.habits.update(habit.id!, { isBreached: false, riskExplanation: undefined });
-      continue;
-    }
-
     const { score: riskScore, logsCount } = await calculateRiskScore(habit);
-    const isBreached = riskScore > BREACH_THRESHOLD;
-    let riskExplanation = habit.riskExplanation;
-    let finalScore = riskScore;
-
-    const oneHour = 3600 * 1000;
-    const needsAudit = !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > oneHour);
-
-    if (force || needsAudit) {
-      const analysis = await analyzeRisk({
-        habitTitle: habit.title,
-        riskScore,
-        resilienceValue: habit.resilienceValue,
-        streakCount: habit.streakCount,
-        targetTime: habit.targetTime,
-        conversationHistory: [],
-        logsCount: logsCount
+    const needsAudit = force || !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > twentyMins);
+    
+    if (needsAudit) {
+      auditQueue.push({
+        item: habit,
+        isTask: false,
+        ctx: {
+          habitTitle: habit.title,
+          riskScore,
+          resilienceValue: habit.resilienceValue,
+          streakCount: habit.streakCount,
+          targetTime: habit.targetTime,
+          conversationHistory: [],
+          logsCount
+        }
       });
-      finalScore = analysis.score;
-      riskExplanation = analysis.explanation;
-    }
-
-    await db.habits.update(habit.id!, {
-      riskScore: finalScore,
-      isBreached,
-      riskExplanation,
-      lastRiskAudit: Date.now()
-    });
-
-    if (finalScore > 0.7) {
-      breachedHabits.push({ ...habit, riskScore: finalScore, isBreached, riskExplanation });
+    } else if (habit.riskScore > 0.7) {
+      breachedHabits.push(habit);
     }
   }
 
-  // Process Tasks
+  // 2. Filter Tasks
   for (const task of tasks) {
     const riskScore = await calculateTaskRiskScore(task);
-    let riskExplanation = task.riskExplanation;
-    let finalScore = riskScore;
+    const needsAudit = force || !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > twentyMins);
 
-    const oneHour = 3600 * 1000;
-    const needsAudit = !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > oneHour);
-
-    if (force || needsAudit) {
-      const analysis = await analyzeRisk({
-        habitTitle: task.title,
-        riskScore,
-        resilienceValue: 0,
-        streakCount: 0,
-        targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
-        conversationHistory: [],
-        isTask: true
+    if (needsAudit) {
+      auditQueue.push({
+        item: task,
+        isTask: true,
+        ctx: {
+          habitTitle: task.title,
+          riskScore,
+          resilienceValue: 0,
+          streakCount: 0,
+          targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
+          conversationHistory: [],
+          isTask: true
+        }
       });
-      finalScore = analysis.score;
-      riskExplanation = analysis.explanation;
+    } else if (task.riskScore > 0.7) {
+      riskyTasks.push(task);
     }
+  }
 
-    await db.tasks.update(task.id!, {
-      riskScore: finalScore,
-      riskExplanation,
-      lastRiskAudit: Date.now()
-    });
-
-    if (finalScore > 0.7) {
-      riskyTasks.push({ ...task, riskScore: finalScore, riskExplanation });
+  // 3. Execute Batch Audit
+  if (auditQueue.length > 0) {
+    const results = await analyzeRiskBatch(auditQueue.map(q => q.ctx));
+    for (let i = 0; i < auditQueue.length; i++) {
+      const q = auditQueue[i];
+      const res = results[i];
+      
+      if (q.isTask) {
+        await db.tasks.update(q.item.id!, { 
+          riskScore: res.score, 
+          riskExplanation: res.explanation, 
+          lastRiskAudit: Date.now() 
+        });
+        if (res.score > 0.7) riskyTasks.push({ ...(q.item as Task), riskScore: res.score, riskExplanation: res.explanation });
+      } else {
+        const h = q.item as Habit;
+        await db.habits.update(h.id!, { 
+          riskScore: res.score, 
+          riskExplanation: res.explanation, 
+          lastRiskAudit: Date.now(),
+          isBreached: res.score > BREACH_THRESHOLD
+        });
+        if (res.score > 0.7) breachedHabits.push({ ...h, riskScore: res.score, riskExplanation: res.explanation });
+      }
     }
   }
 
   // Mark recon as run for today
   if (typeof window !== 'undefined') {
-    localStorage.setItem('BASE_LAST_RECON', todayStr);
+    localStorage.setItem('BASE_LAST_RECON', new Date().toDateString());
   }
 
   if (breachedHabits.length > 0 || riskyTasks.length > 0) {
-    const total = breachedHabits.length + riskyTasks.length;
-    const descriptions = [
-      ...breachedHabits.map(h => `HABIT: ${h.title} - ${h.riskExplanation}`),
-      ...riskyTasks.map(t => `TASK: ${t.title} - ${t.riskExplanation}`)
-    ].join('\n\n');
-
+    const totalCount = breachedHabits.length + riskyTasks.length;
     await sendPushNotification(
-      `MORNING RECON: ${total} VECTORS`,
-      descriptions,
-      4
+      `SURVEILLANCE ALERT: ${totalCount} HIGH-RISK VECTORS`,
+      `Critical schedule drift detected. Auditor intervention required.`
     );
   }
 

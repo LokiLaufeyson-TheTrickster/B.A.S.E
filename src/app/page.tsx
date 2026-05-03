@@ -78,59 +78,12 @@ export default function HomePage() {
   // ── Background Risk Auditor (Real-time) ──────────────────────────────────────
   useEffect(() => {
     const auditorInterval = setInterval(async () => {
-      const allHabits = await db.habits.toArray();
-      const allTasks = await db.tasks.where('status').equals('pending').toArray();
       const aiReady = hasAnyProvider();
-      const oneHour = 3600 * 1000;
-
-      // Audit Habits
-      for (const habit of allHabits) {
-        const { score } = await calculateRiskScore(habit);
-        const needsAudit = !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > oneHour);
-        
-        if (aiReady && (score > 0 || needsAudit)) {
-          const analysis = await analyzeRisk({
-            habitTitle: habit.title,
-            riskScore: score,
-            resilienceValue: habit.resilienceValue,
-            streakCount: habit.streakCount,
-            targetTime: habit.targetTime,
-            conversationHistory: [],
-          });
-          await db.habits.update(habit.id!, { 
-            riskScore: analysis.score, 
-            riskExplanation: analysis.explanation,
-            lastRiskAudit: Date.now()
-          });
-        }
+      if (aiReady) {
+        await runMorningRecon();
+        loadData();
       }
-
-      // Audit Tasks
-      for (const task of allTasks) {
-        const { calculateTaskRiskScore } = await import('@/lib/riskEngine');
-        const score = await calculateTaskRiskScore(task);
-        const needsAudit = !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > oneHour);
-
-        if (aiReady && (score > 0 || needsAudit)) {
-          const analysis = await analyzeRisk({
-            habitTitle: task.title,
-            riskScore: score,
-            resilienceValue: 0,
-            streakCount: 0,
-            targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
-            conversationHistory: [],
-            isTask: true
-          });
-          await db.tasks.update(task.id!, { 
-            riskScore: analysis.score, 
-            riskExplanation: analysis.explanation,
-            lastRiskAudit: Date.now()
-          });
-        }
-      }
-      
-      loadData();
-    }, 60000); // Run every minute
+    }, 60000); // Check every minute, but runMorningRecon handles its own cooldown
 
     return () => clearInterval(auditorInterval);
   }, [loadData]);

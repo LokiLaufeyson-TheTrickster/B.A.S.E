@@ -246,8 +246,104 @@ export async function queryThinkingPartner(ctx: ThinkingPartnerContext): Promise
 }
 
 export interface RiskAnalysis {
+  id?: number; // Optional ID for matching in batch
   score: number;
   explanation: string;
+}
+
+export async function analyzeRiskBatch(items: ThinkingPartnerContext[]): Promise<RiskAnalysis[]> {
+  if (items.length === 0) return [];
+  
+  const itemsText = items.map((ctx, i) => `
+ITEM_${i}:
+- Type: ${ctx.isTask ? 'Task' : 'Habit'}
+- Title: "${ctx.habitTitle}"
+- Context: ${buildHabitContext(ctx)}
+- Deadline: ${ctx.targetTime}
+`).join('\n---\n');
+
+  const prompt = `You are a cold, data-driven AUDITOR. Analyze these ${items.length} items and predict a RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic for each.
+Be objective. 1.0=failure certain, 0.0=perfect.
+
+Items to analyze:
+${itemsText}
+
+Response MUST be a JSON array of objects, each with keys "score" (number) and "explanation" (string). 
+The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
+
+  // 1. Try Gemini
+  const apiKey = getGeminiKey();
+  if (apiKey && isGeminiEnabled()) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { 
+              temperature: 0.7, 
+              maxOutputTokens: 1000,
+              responseMimeType: "application/json" 
+            },
+          }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) {
+          const parsed = extractJSON(text);
+          if (Array.isArray(parsed)) {
+            await logDebug('gemini', 'gemini-2.5-flash (batch)', prompt, text);
+            return parsed.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Gemini batch error:', e);
+    }
+  }
+
+  // 2. Try OpenRouter
+  const orModels = getORModels();
+  const orKey = getORKey();
+  if (orKey && orModels.length > 0) {
+    for (const model of orModels) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${orKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 1000,
+            response_format: { type: "json_object" }
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.choices?.[0]?.message?.content?.trim();
+          if (text) {
+            const parsed = extractJSON(text);
+            const list = Array.isArray(parsed) ? parsed : (parsed.items || parsed.results || []);
+            if (Array.isArray(list)) {
+              await logDebug('openrouter', `${model} (batch)`, prompt, text);
+              return list.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // Fallback: individual calls if batch fails (or just return empty)
+  return items.map(() => ({ score: 0, explanation: "Batch analysis failed." }));
 }
 
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {

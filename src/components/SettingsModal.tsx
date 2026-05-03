@@ -298,16 +298,23 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
                     {(() => {
                       const extracted = extractJSON(log.response);
                       if (!extracted) return null;
+                      
+                      const items = Array.isArray(extracted) ? extracted : [extracted];
+                      
                       return (
                         <div style={{ borderTop: '1px dashed var(--gray-300)', paddingTop: '6px', marginTop: '6px' }}>
-                          <div style={{ color: 'var(--amber)', fontSize: '9px', fontWeight: 800, marginBottom: '4px' }}>🔍 EXTRACTED FEATURES (JSON TEST)</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px', fontSize: '10px' }}>
-                            <span style={{ color: 'var(--gray-500)' }}>Risk Score:</span>
-                            <span style={{ color: Number(extracted.score) > 0.7 ? 'var(--crimson)' : 'var(--green)', fontWeight: 700 }}>
-                              {(Number(extracted.score) * 100).toFixed(0)}%
-                            </span>
-                            <span style={{ color: 'var(--gray-500)' }}>Explanation:</span>
-                            <span style={{ color: 'var(--white)' }}>{extracted.explanation}</span>
+                          <div style={{ color: 'var(--amber)', fontSize: '9px', fontWeight: 800, marginBottom: '4px' }}>🔍 EXTRACTED FEATURES ({items.length} ITEM{items.length !== 1 ? 'S' : ''})</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {items.map((item: any, idx: number) => (
+                              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px', fontSize: '10px', paddingBottom: idx < items.length - 1 ? '4px' : 0, borderBottom: idx < items.length - 1 ? '1px dotted var(--gray-200)' : 'none' }}>
+                                <span style={{ color: 'var(--gray-500)' }}>Item #{idx}:</span>
+                                <span style={{ color: Number(item.score) > 0.7 ? 'var(--crimson)' : 'var(--green)', fontWeight: 700 }}>
+                                  {(Number(item.score) * 100).toFixed(0)}%
+                                </span>
+                                <span style={{ color: 'var(--gray-500)' }}>Explanation:</span>
+                                <span style={{ color: 'var(--white)' }}>{item.explanation}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       );
