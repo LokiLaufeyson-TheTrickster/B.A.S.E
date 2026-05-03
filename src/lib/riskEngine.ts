@@ -12,6 +12,7 @@
 
 import { db, type Habit, type HabitLog, type Task } from './db';
 import { explainRisk } from './gemini';
+import { sendPushNotification } from './ntfy';
 
 const BREACH_THRESHOLD = 0.75;
 const DRIFT_THRESHOLD_MINUTES = 30; // T_threshold
@@ -186,6 +187,15 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
   // Mark recon as run for today
   if (typeof window !== 'undefined') {
     localStorage.setItem('BASE_LAST_RECON', todayStr);
+  }
+
+  if (breachedHabits.length > 0 || riskyTasks.length > 0) {
+    const total = breachedHabits.length + riskyTasks.length;
+    await sendPushNotification(
+      'MORNING RECON: RISKY VECTORS',
+      `${total} breaches/risks detected. Your identity is under surveillance.`,
+      4
+    );
   }
 
   return { habits: breachedHabits, tasks: riskyTasks };

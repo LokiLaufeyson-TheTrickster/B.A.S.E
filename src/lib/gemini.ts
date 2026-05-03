@@ -214,36 +214,65 @@ export async function queryThinkingPartner(ctx: ThinkingPartnerContext): Promise
 }
 
 export async function explainRisk(ctx: ThinkingPartnerContext): Promise<string> {
-  const apiKey = getGeminiKey();
-  if (!apiKey || !isGeminiEnabled()) {
-    // Basic fallback explanation if AI is off
-    if (ctx.riskScore > 0.8) return "Critical drift detected in execution pattern.";
-    if (ctx.resilienceValue < 30) return "Identity erosion: consecutive failures have decimated resilience.";
-    return "Statistical volatility in performance metrics.";
-  }
-
-  const prompt = `You are a cold, data-driven auditor. Analyze this ${ctx.isTask ? 'task' : 'habit'} and provide a ONE-SENTENCE explanation for why it is considered 'RISKY' (Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%). 
-Focus on the variance, volatility, or overdue status. No comfort. Just the diagnostic truth.
+  const prompt = `You are a cold, data-driven AUDITOR. Analyze this ${ctx.isTask ? 'task' : 'habit'} and provide a ONE-SENTENCE diagnostic for why it is 'RISKY' (Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%). 
+Use simple, brutal language. No jargon like "drift" or "volatility" unless you explain it. 
 Data: ${buildHabitContext(ctx)}`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.5, maxOutputTokens: 60 },
-        }),
+  // 1. Try Gemini
+  const apiKey = getGeminiKey();
+  if (apiKey && isGeminiEnabled()) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 60 },
+          }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) return text;
       }
-    );
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Unstable execution detected.";
-  } catch {
-    return "Data-driven breach: performance variance exceeds safe threshold.";
+    } catch {}
   }
+
+  // 2. Try OpenRouter
+  const orModels = getORModels();
+  const orKey = getORKey();
+  if (orKey && orModels.length > 0) {
+    for (const model of orModels) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${orKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 60,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.choices?.[0]?.message?.content?.trim();
+          if (text) return text;
+        }
+      } catch {}
+    }
+  }
+
+  // 3. Fallback
+  if (ctx.riskScore > 0.8) return "You're consistently missing your target. Your word is currently worthless.";
+  if (ctx.resilienceValue < 30) return "Your discipline has collapsed. You are operating on pure excuse-mode.";
+  return "Statistical failure: you are deviating from your own promised schedule.";
 }
 
 // ── Connection Testing ─────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ export default function HomePage() {
   const [isLocked, setIsLocked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [aiActive, setAiActive] = useState(false);
+  const [breachAcknowledged, setBreachAcknowledged] = useState(false);
 
   // ── Filter State ─────────────────────────────────────────────────────────────
   const [filterPriority, setFilterPriority] = useState<number | null>(null);
@@ -44,14 +45,17 @@ export default function HomePage() {
     const breached = h.filter(habit => habit.isBreached);
     setBreachedHabits(breached);
 
-    if (breached.length > 0) {
+    if (breached.length > 0 && !breachAcknowledged) {
       setShowBreach(true);
       setIsLocked(true);
+    } else if (breached.length > 0) {
+      setIsLocked(true); // Keep locked, but don't force overlay if acknowledged
     } else {
       setShowBreach(false);
       setIsLocked(false);
+      setBreachAcknowledged(false); // Reset if no breaches
     }
-  }, []);
+  }, [breachAcknowledged]);
 
   useEffect(() => {
     loadData();
@@ -153,7 +157,7 @@ export default function HomePage() {
 
   const handleBreachDismiss = () => {
     setShowBreach(false);
-    setIsLocked(false);
+    setBreachAcknowledged(true);
   };
 
   const handleManualRecon = async () => {
