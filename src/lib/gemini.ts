@@ -14,6 +14,7 @@ const OR_MODELS = 'BASE_OR_MODELS';
 const VERIFIED_KEY = 'BASE_VERIFIED_PROVIDERS';
 const GEMINI_ENABLED = 'BASE_GEMINI_ENABLED';
 import { db } from './db';
+import { extractJSON } from './utils';
 
 export function getGeminiKey(): string { return (typeof window !== 'undefined' && localStorage.getItem(GEMINI_KEY)) || ''; }
 export function setGeminiKey(k: string) { localStorage.setItem(GEMINI_KEY, k); clearVerified('gemini'); }
@@ -247,16 +248,6 @@ export async function queryThinkingPartner(ctx: ThinkingPartnerContext): Promise
 export interface RiskAnalysis {
   score: number;
   explanation: string;
-}
-
-function extractJSON(text: string): any {
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
 }
 
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {

@@ -10,6 +10,7 @@ import {
   isGeminiEnabled, setGeminiEnabled,
 } from '@/lib/gemini';
 import { db } from '@/lib/db';
+import { extractJSON } from '@/lib/utils';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -290,9 +291,27 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
                   </div>
                   <div>
                     <div style={{ color: 'var(--gray-500)', fontSize: '9px', marginBottom: '2px', fontWeight: 700 }}>MODEL RESPONSE:</div>
-                    <div style={{ color: 'var(--white)', fontStyle: 'italic', background: 'var(--gray-200)', padding: '6px', borderRadius: '2px' }}>
+                    <div style={{ color: 'var(--white)', fontStyle: 'italic', background: 'var(--gray-200)', padding: '6px', borderRadius: '2px', marginBottom: '8px' }}>
                       {log.response}
                     </div>
+                    {/* Extracted Features */}
+                    {(() => {
+                      const extracted = extractJSON(log.response);
+                      if (!extracted) return null;
+                      return (
+                        <div style={{ borderTop: '1px dashed var(--gray-300)', paddingTop: '6px', marginTop: '6px' }}>
+                          <div style={{ color: 'var(--amber)', fontSize: '9px', fontWeight: 800, marginBottom: '4px' }}>🔍 EXTRACTED FEATURES (JSON TEST)</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px', fontSize: '10px' }}>
+                            <span style={{ color: 'var(--gray-500)' }}>Risk Score:</span>
+                            <span style={{ color: Number(extracted.score) > 0.7 ? 'var(--crimson)' : 'var(--green)', fontWeight: 700 }}>
+                              {(Number(extracted.score) * 100).toFixed(0)}%
+                            </span>
+                            <span style={{ color: 'var(--gray-500)' }}>Explanation:</span>
+                            <span style={{ color: 'var(--white)' }}>{extracted.explanation}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

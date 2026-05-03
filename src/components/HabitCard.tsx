@@ -41,6 +41,7 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo,
     : false;
   const [showTP, setShowTP] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <>
@@ -51,10 +52,19 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo,
           <div className="item-meta">
             <span>{habit.targetTime}</span>
             <span>{formatRecurrence(habit)}</span>
-            <span className={`item-risk ${risk.className}`}>RISK: {risk.text}</span>
+            <span 
+              className={`item-risk ${risk.className}`} 
+              onClick={() => setExpanded(!expanded)}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              RISK: {risk.text}
+              {habit.riskExplanation && (
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
+              )}
+            </span>
           </div>
-          {habit.riskScore > 0 && habit.riskExplanation && (
-            <div className="risk-explanation animate-fade-in">
+          {habit.riskScore > 0 && habit.riskExplanation && expanded && (
+            <div className="risk-explanation animate-fade-in" style={{ cursor: 'pointer' }} onClick={() => setExpanded(false)}>
               {habit.riskExplanation}
             </div>
           )}

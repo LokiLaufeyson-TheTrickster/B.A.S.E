@@ -45,6 +45,7 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
 
   const [showTP, setShowTP] = React.useState(false);
   const [showActions, setShowActions] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
 
   return (
     <div className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}>
@@ -58,14 +59,21 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
             {isFailed ? 'FAILED' : isOverdue ? 'OVERDUE: ' : ''}{!isFailed && dueStr}
           </span>
           <span>P{task.priority}</span>
-          {task.riskScore > 0 && !isCompleted && !isFailed && (
-            <span className={`item-risk ${task.riskScore > 0.6 ? 'high' : 'medium'}`}>
+          {(task.riskScore > 0 || task.lastRiskAudit) && !isCompleted && !isFailed && (
+            <span 
+              className={`item-risk ${task.riskScore > 0.6 ? 'high' : 'medium'}`}
+              onClick={() => setExpanded(!expanded)}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
               RISK: {(task.riskScore * 100).toFixed(0)}%
+              {task.riskExplanation && (
+                <span style={{ fontSize: '8px', opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
+              )}
             </span>
           )}
         </div>
-        {task.riskScore > 0 && task.riskExplanation && !isCompleted && !isFailed && (
-          <div className="risk-explanation animate-fade-in">
+        {task.riskScore > 0 && task.riskExplanation && expanded && !isCompleted && !isFailed && (
+          <div className="risk-explanation animate-fade-in" style={{ cursor: 'pointer' }} onClick={() => setExpanded(false)}>
             {task.riskExplanation}
           </div>
         )}
