@@ -30,9 +30,9 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
   const [orModels, setORModelsLocal] = useState<string[]>([]);
   const [newModel, setNewModel] = useState('');
   const [orStatuses, setORStatuses] = useState<Record<string, TestStatus>>({});
-  const [purgeConfirm, setPurgeConfirm] = useState(false);
   const [providerActive, setProviderActive] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [purgeType, setPurgeType] = useState<'tasks' | 'habits' | 'both' | 'keys' | 'all' | null>(null);
 
   const refreshProvider = () => setProviderActive(hasAnyProvider());
 
@@ -97,18 +97,40 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
     refreshProvider();
   };
 
-  const handlePurge = async () => {
-    if (!purgeConfirm) {
-      setPurgeConfirm(true);
+  const handlePurge = async (type: 'tasks' | 'habits' | 'both' | 'keys' | 'all') => {
+    if (purgeType !== type) {
+      setPurgeType(type);
       return;
     }
-    await db.habits.clear();
-    await db.tasks.clear();
-    await db.logs.clear();
-    await db.dojo.clear();
-    await db.identity.clear();
+
+    if (type === 'tasks' || type === 'both' || type === 'all') {
+      await db.tasks.clear();
+    }
+    if (type === 'habits' || type === 'both' || type === 'all') {
+      await db.habits.clear();
+      await db.logs.clear();
+    }
+    if (type === 'all') {
+      await db.dojo.clear();
+      await db.identity.clear();
+    }
+    if (type === 'keys' || type === 'all') {
+      setGeminiKey('');
+      setORKey('');
+      setORModels([]);
+      localStorage.removeItem('BASE_GEMINI_KEY');
+      localStorage.removeItem('BASE_OR_KEY');
+      localStorage.removeItem('BASE_OR_MODELS');
+      setGeminiKeyLocal('');
+      setORKeyLocal('');
+      setORModelsLocal([]);
+    }
+
+    setPurgeType(null);
     onPurge();
-    onClose();
+    if (type === 'all' || type === 'keys') {
+      onClose();
+    }
   };
 
   const statusIcon = (s: TestStatus) => {
@@ -378,27 +400,76 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
 
             {/* ── Danger Zone ──────────────────────────────────────────── */}
             <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px' }}>
-              <label style={{ ...labelStyle, color: 'var(--crimson)' }}>DANGER ZONE</label>
-              {purgeConfirm && (
-                <div style={{
-                  fontSize: '10px', color: 'var(--crimson)',
-                  marginBottom: '8px', fontFamily: 'var(--font-mono)',
-                  letterSpacing: '0.5px',
-                }}>
-                  ⚠ THIS WILL DELETE ALL HABITS, TASKS, LOGS, AND DOJO TRACKS. CLICK AGAIN TO CONFIRM.
-                </div>
-              )}
+              <label style={{ ...labelStyle, color: 'var(--crimson)' }}>DANGER ZONE — GRANULAR PURGE</label>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+                <button
+                  onClick={() => handlePurge('tasks')}
+                  style={{
+                    ...btnSmall, padding: '10px',
+                    color: purgeType === 'tasks' ? 'var(--white)' : 'var(--crimson)',
+                    border: `1px solid var(--crimson)`,
+                    background: purgeType === 'tasks' ? 'var(--crimson)' : 'transparent',
+                  }}
+                >
+                  {purgeType === 'tasks' ? 'CONFIRM: TASKS' : 'DELETE TASKS ONLY'}
+                </button>
+                <button
+                  onClick={() => handlePurge('habits')}
+                  style={{
+                    ...btnSmall, padding: '10px',
+                    color: purgeType === 'habits' ? 'var(--white)' : 'var(--crimson)',
+                    border: `1px solid var(--crimson)`,
+                    background: purgeType === 'habits' ? 'var(--crimson)' : 'transparent',
+                  }}
+                >
+                  {purgeType === 'habits' ? 'CONFIRM: HABITS' : 'DELETE HABITS ONLY'}
+                </button>
+                <button
+                  onClick={() => handlePurge('both')}
+                  style={{
+                    ...btnSmall, padding: '10px',
+                    color: purgeType === 'both' ? 'var(--white)' : 'var(--crimson)',
+                    border: `1px solid var(--crimson)`,
+                    background: purgeType === 'both' ? 'var(--crimson)' : 'transparent',
+                  }}
+                >
+                  {purgeType === 'both' ? 'CONFIRM: BOTH' : 'DELETE TASKS + HABITS'}
+                </button>
+                <button
+                  onClick={() => handlePurge('keys')}
+                  style={{
+                    ...btnSmall, padding: '10px',
+                    color: purgeType === 'keys' ? 'var(--white)' : 'var(--crimson)',
+                    border: `1px solid var(--crimson)`,
+                    background: purgeType === 'keys' ? 'var(--crimson)' : 'transparent',
+                  }}
+                >
+                  {purgeType === 'keys' ? 'CONFIRM: KEYS' : 'DELETE API + MODELS'}
+                </button>
+              </div>
+
               <button
-                onClick={handlePurge}
+                onClick={() => handlePurge('all')}
                 style={{
-                  ...btnSmall, width: '100%', padding: '12px',
-                  color: purgeConfirm ? 'var(--white)' : 'var(--crimson)',
+                  ...btnSmall, width: '100%', padding: '12px', marginTop: '8px',
+                  color: purgeType === 'all' ? 'var(--white)' : 'var(--crimson)',
                   border: `1px solid var(--crimson)`,
-                  background: purgeConfirm ? 'var(--crimson)' : 'transparent',
+                  background: purgeType === 'all' ? 'var(--crimson)' : 'transparent',
                 }}
               >
-                {purgeConfirm ? 'CONFIRM — PURGE EVERYTHING' : 'PURGE ALL DATA'}
+                {purgeType === 'all' ? 'CONFIRM: TOTAL WIPE' : 'DELETE ALL DATA (RESET)'}
               </button>
+              
+              {purgeType && (
+                <div style={{
+                  fontSize: '9px', color: 'var(--amber)',
+                  marginTop: '8px', fontFamily: 'var(--font-mono)',
+                  textAlign: 'center', letterSpacing: '0.5px'
+                }}>
+                  ⚠ CLICK THE HIGHLIGHTED BUTTON AGAIN TO CONFIRM SELECTION
+                </div>
+              )}
             </div>
           </div>
         )}
