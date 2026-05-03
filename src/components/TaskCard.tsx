@@ -44,6 +44,7 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
   })();
 
   const [showTP, setShowTP] = React.useState(false);
+  const [showActions, setShowActions] = React.useState(false);
 
   return (
     <div className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}>
@@ -91,48 +92,67 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
           UNDO
         </button>
       ) : (
-        <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+        <button
+          onClick={() => setShowActions(!showActions)}
+          title="More actions"
+          style={{
+            color: 'var(--gray-400)', fontSize: '16px',
+            padding: '8px', transition: 'var(--transition)',
+            lineHeight: 1,
+          }}
+        >
+          ⋮
+        </button>
+      )}
+
+      {/* Action Menu Popover */}
+      {showActions && !isCompleted && !isFailed && (
+        <div className="item-action-menu animate-slide-up" style={{
+          position: 'absolute', bottom: '100%', right: '0',
+          background: 'var(--gray-100)', border: '1px solid var(--gray-300)',
+          borderRadius: 'var(--radius)', padding: '8px',
+          display: 'flex', flexDirection: 'column', gap: '4px',
+          zIndex: 10, boxShadow: 'var(--shadow-lg)',
+          minWidth: '120px',
+          marginTop: '-6px', marginBottom: '2px',
+        }}>
           <button
-            onClick={() => onExplain(task)}
+            onClick={() => { onExplain(task); setShowActions(false); }}
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
-              color: 'var(--crimson)', padding: '6px 10px',
+              color: 'var(--crimson)', padding: '6px 12px',
               border: '1px solid var(--crimson)',
               borderRadius: 'var(--radius)',
               background: 'var(--crimson-glow)',
               cursor: 'pointer',
-              transition: 'var(--transition)',
             }}
           >
             {task.riskExplanation ? 'REFRESH RISK' : 'EXPLAIN RISK'}
           </button>
           <button
-            onClick={() => onEdit(task)}
+            onClick={() => { onEdit(task); setShowActions(false); }}
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
-              color: 'var(--amber)', padding: '6px 10px',
+              color: 'var(--amber)', padding: '6px 12px',
               border: '1px solid var(--amber)',
               borderRadius: 'var(--radius)',
               background: 'rgba(255, 191, 0, 0.05)',
               cursor: 'pointer',
-              transition: 'var(--transition)',
             }}
           >
             EDIT
           </button>
           <button
-            onClick={() => task.id && onFail(task.id)}
-            title="Mark as failed"
+            onClick={() => { task.id && onFail(task.id); setShowActions(false); }}
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
-              color: 'var(--gray-500)', padding: '6px 10px',
+              color: 'var(--gray-500)', padding: '6px 12px',
               border: '1px solid var(--gray-300)',
               borderRadius: 'var(--radius)',
               cursor: 'pointer',
-              transition: 'var(--transition)',
             }}
           >
             FAIL
@@ -142,16 +162,15 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
               if (task.id) {
                 onDelete && onDelete(task.id);
               }
+              setShowActions(false);
             }}
-            title="Delete task (No impact)"
             style={{
               fontSize: '9px', fontWeight: 700,
               letterSpacing: '1px', textTransform: 'uppercase',
-              color: 'var(--gray-400)', padding: '6px 10px',
+              color: 'var(--gray-400)', padding: '6px 12px',
               border: '1px solid var(--gray-200)',
               borderRadius: 'var(--radius)',
               cursor: 'pointer',
-              transition: 'var(--transition)',
             }}
           >
             CANCEL
