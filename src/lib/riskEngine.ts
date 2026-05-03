@@ -101,16 +101,24 @@ export async function calculateRiskScore(habit: Habit): Promise<{ score: number,
 
 export async function calculateTaskRiskScore(task: Task): Promise<number> {
   const now = Date.now();
-  if (!task.dueDate) return 0.2 * (5 - task.priority); // Low risk if no due date, priority based
+  if (!task.dueDate) return 0.2 * (5 - task.priority);
 
   const timeLeft = task.dueDate - now;
   const hoursLeft = timeLeft / (1000 * 60 * 60);
 
   if (timeLeft < 0) return 1.0; // Overdue is critical
-  if (hoursLeft < 4) return 0.9; // Due soon is high risk
-  if (hoursLeft < 12) return 0.7; // Same day is moderate risk
+  
+  // If more than 24 hours away, risk is low, priority based
+  if (hoursLeft > 24) {
+    return Math.max(0.1, (5 - task.priority) * 0.08);
+  }
 
-  return Math.max(0.1, (5 - task.priority) * 0.1);
+  // If within 24 hours, risk increases
+  const baseRisk = (5 - task.priority) * 0.1;
+  const timeFactor = 1 - (hoursLeft / 24); // 0 at 24h, 1 at 0h
+  const risk = baseRisk + (0.95 - baseRisk) * Math.pow(timeFactor, 1.5); 
+
+  return Math.min(0.95, risk);
 }
 
 export async function runMorningRecon(force = false): Promise<{ habits: Habit[], tasks: Task[] }> {

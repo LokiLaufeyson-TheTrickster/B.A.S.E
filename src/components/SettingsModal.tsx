@@ -32,6 +32,8 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
   const [orStatuses, setORStatuses] = useState<Record<string, TestStatus>>({});
   const [providerActive, setProviderActive] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<any[]>([]);
   const [purgeType, setPurgeType] = useState<'tasks' | 'habits' | 'both' | 'keys' | 'all' | null>(null);
 
   const refreshProvider = () => setProviderActive(hasAnyProvider());
@@ -42,7 +44,13 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
     setORModelsLocal(getORModels());
     setGeminiOn(isGeminiEnabled());
     refreshProvider();
+    loadDebugLogs();
   }, []);
+
+  const loadDebugLogs = async () => {
+    const logs = await db.debugLogs.orderBy('timestamp').reverse().toArray();
+    setDebugLogs(logs);
+  };
 
   const handleSaveGemini = () => {
     setGeminiKey(geminiKey.trim());
@@ -179,6 +187,21 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
           </span>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <button
+              onClick={() => { setShowDebug(!showDebug); if (!showDebug) loadDebugLogs(); }}
+              title="Audit AI Prompts"
+              style={{
+                color: 'var(--amber)',
+                fontSize: '10px',
+                fontWeight: 800,
+                letterSpacing: '1px',
+                padding: '4px 8px',
+                border: '1px solid var(--amber)',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              DEBUG AUDIT
+            </button>
+            <button
               onClick={() => setShowInfo(!showInfo)}
               title="Identity Tutorial & Metrics FAQ"
               style={{
@@ -235,6 +258,44 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
                 Deleting a habit normally wipes its logs, which can lower your EXEC rate. 
                 Use **ARCHIVE** on Habits or **CANCEL** on Tasks to remove them from your view while preserving their positive impact on your metrics.
               </div>
+            </div>
+          </div>
+        ) : showDebug ? (
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--amber)', letterSpacing: '2px' }}>⚡ AI INTERACTION AUDIT (LAST 50)</div>
+              <button 
+                onClick={async () => { await db.debugLogs.clear(); loadDebugLogs(); }}
+                style={{ fontSize: '9px', color: 'var(--gray-500)', textDecoration: 'underline' }}
+              >
+                Clear Audit
+              </button>
+            </div>
+            {debugLogs.length === 0 && <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>No interactions logged yet.</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
+              {debugLogs.map(log => (
+                <div key={log.id} style={{ 
+                  background: 'var(--gray-100)', border: '1px solid var(--gray-300)', 
+                  borderRadius: 'var(--radius)', padding: '12px', fontSize: '11px' 
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px solid var(--gray-200)', paddingBottom: '4px' }}>
+                    <span style={{ color: 'var(--amber)', fontWeight: 700 }}>{log.provider.toUpperCase()} • {log.model}</span>
+                    <span style={{ color: 'var(--gray-500)', fontSize: '9px' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{ color: 'var(--gray-500)', fontSize: '9px', marginBottom: '2px', fontWeight: 700 }}>AUDITOR PROMPT:</div>
+                    <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--ghost)', fontFamily: 'var(--font-mono)', fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '2px' }}>
+                      {log.prompt}
+                    </pre>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--gray-500)', fontSize: '9px', marginBottom: '2px', fontWeight: 700 }}>MODEL RESPONSE:</div>
+                    <div style={{ color: 'var(--white)', fontStyle: 'italic', background: 'var(--gray-200)', padding: '6px', borderRadius: '2px' }}>
+                      {log.response}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : (

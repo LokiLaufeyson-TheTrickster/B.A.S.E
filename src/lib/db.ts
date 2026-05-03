@@ -66,6 +66,15 @@ export interface IdentitySnapshot {
   totalMissed: number;
 }
 
+export interface DebugLog {
+  id?: number;
+  timestamp: number;
+  provider: string;
+  model: string;
+  prompt: string;
+  response: string;
+}
+
 // ── Database ───────────────────────────────────────────────────────────────────
 
 class BaseDB extends Dexie {
@@ -74,6 +83,7 @@ class BaseDB extends Dexie {
   dojo!: Table<DojoTrack>;
   logs!: Table<HabitLog>;
   identity!: Table<IdentitySnapshot>;
+  debugLogs!: Table<DebugLog>;
 
   constructor() {
     super('BASE_DB');
@@ -86,12 +96,13 @@ class BaseDB extends Dexie {
       identity: '++id, vector, timestamp',
     });
 
-    this.version(5).stores({
+    this.version(6).stores({
       habits: '++id, title, priority, *tags, targetTime, recurrence, riskScore, resilienceValue, isBreached',
       tasks: '++id, title, priority, *tags, dueDate, status, riskScore',
       dojo: '++id, blob, title, category, icon',
       logs: '++id, habitId, timestamp, jitterValue, riskSnapshot',
       identity: '++id, vector, timestamp',
+      debugLogs: '++id, timestamp'
     });
   }
 }

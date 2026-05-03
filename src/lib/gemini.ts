@@ -13,6 +13,7 @@ const OR_KEY = 'BASE_OR_KEY';
 const OR_MODELS = 'BASE_OR_MODELS';
 const VERIFIED_KEY = 'BASE_VERIFIED_PROVIDERS';
 const GEMINI_ENABLED = 'BASE_GEMINI_ENABLED';
+import { db } from './db';
 
 export function getGeminiKey(): string { return (typeof window !== 'undefined' && localStorage.getItem(GEMINI_KEY)) || ''; }
 export function setGeminiKey(k: string) { localStorage.setItem(GEMINI_KEY, k); clearVerified('gemini'); }
@@ -85,7 +86,7 @@ function buildHabitContext(ctx: ThinkingPartnerContext): string {
 - Task: "${ctx.habitTitle}"
 - Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
 - Target Time: ${ctx.targetTime}
-- Current Time: ${new Date().toLocaleTimeString()}`;
+- Current Time: ${new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
   }
   return `CURRENT HABIT DATA:
 - Habit: "${ctx.habitTitle}"
@@ -94,7 +95,27 @@ function buildHabitContext(ctx: ThinkingPartnerContext): string {
 - Current Streak: ${ctx.streakCount} days
 - Target Time: ${ctx.targetTime}
 - Historical Logs Count: ${ctx.logsCount ?? 0}
-- Current Time: ${new Date().toLocaleTimeString()}`;
+- Current Time: ${new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+}
+
+async function logDebug(provider: string, model: string, prompt: string, response: string) {
+  try {
+    await db.debugLogs.add({
+      timestamp: Date.now(),
+      provider,
+      model,
+      prompt,
+      response
+    });
+    // Keep only last 50 logs
+    const count = await db.debugLogs.count();
+    if (count > 50) {
+      const oldest = await db.debugLogs.orderBy('timestamp').limit(count - 50).toArray();
+      await db.debugLogs.bulkDelete(oldest.map(l => l.id!));
+    }
+  } catch (e) {
+    console.error('Failed to log debug:', e);
+  }
 }
 
 // ── Gemini Provider ────────────────────────────────────────────────────────────
@@ -133,7 +154,11 @@ async function queryGemini(ctx: ThinkingPartnerContext): Promise<string | null> 
     );
     if (!res.ok) return null;
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    const result = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    if (result) {
+      await logDebug('gemini', 'gemini-2.5-flash', SYSTEM_PROMPT + '\n\n' + buildHabitContext(ctx), result);
+    }
+    return result;
   } catch { return null; }
 }
 
@@ -162,7 +187,11 @@ async function queryOpenRouter(ctx: ThinkingPartnerContext, model: string): Prom
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || null;
+    const result = data.choices?.[0]?.message?.content || null;
+    if (result) {
+      await logDebug('openrouter', model, SYSTEM_PROMPT + '\n\n' + buildHabitContext(ctx), result);
+    }
+    return result;
   } catch { return null; }
 }
 
@@ -238,7 +267,10 @@ Data: ${buildHabitContext(ctx)}`;
       if (res.ok) {
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return text;
+        if (text) {
+          await logDebug('gemini', 'gemini-2.5-flash (explain)', prompt, text);
+          return text;
+        }
       }
     } catch {}
   }
@@ -265,7 +297,10 @@ Data: ${buildHabitContext(ctx)}`;
         if (res.ok) {
           const data = await res.json();
           const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) return text;
+          if (text) {
+            await logDebug('openrouter', `${model} (explain)`, prompt, text);
+            return text;
+          }
         }
       } catch {}
     }
