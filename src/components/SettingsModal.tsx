@@ -262,7 +262,7 @@ export default function SettingsModal({ onClose, onPurge }: SettingsModalProps) 
           </div>
         ) : showDebug ? (
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--amber)', letterSpacing: '2px' }}>⚡ AI INTERACTION AUDIT (LAST 50)</div>
               <button 
                 onClick={async () => { await db.debugLogs.clear(); loadDebugLogs(); }}
