@@ -49,12 +49,8 @@ export default function HomePage() {
 
     if (breached.length > 0 && !breachAcknowledged) {
       setShowBreach(true);
-      setIsLocked(true);
-    } else if (breached.length > 0) {
-      setIsLocked(true); // Keep locked, but don't force overlay if acknowledged
     } else {
       setShowBreach(false);
-      setIsLocked(false);
       setBreachAcknowledged(false); // Reset if no breaches
     }
   }, [breachAcknowledged]);
@@ -163,6 +159,27 @@ export default function HomePage() {
     } else {
       await db.tasks.put(updated);
     }
+    await loadData();
+  };
+
+  const handleUndoHabit = async (id: number) => {
+    const habit = await db.habits.get(id);
+    if (!habit || !habit.lastCompleted) return;
+    
+    // Delete latest log
+    await db.logs.where('habitId').equals(id).and(l => l.timestamp === habit.lastCompleted).delete();
+    
+    // Revert state
+    await db.habits.update(id, {
+      lastCompleted: null,
+      streakCount: Math.max(0, habit.streakCount - 1),
+      resilienceValue: Math.max(0, habit.resilienceValue - 5)
+    });
+    await loadData();
+  };
+
+  const handleUndoTask = async (id: number) => {
+    await db.tasks.update(id, { status: 'pending', completedAt: null });
     await loadData();
   };
 
@@ -339,14 +356,10 @@ export default function HomePage() {
       <nav className="nav-tabs">
         <button className={`nav-tab ${activeTab === 'habits' ? 'active' : ''} ${breachedHabits.length > 0 ? 'breached' : ''}`}
           onClick={() => setActiveTab('habits')}>HABITS</button>
-        <button className={`nav-tab ${activeTab === 'tasks' ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-          onClick={() => !isLocked && setActiveTab('tasks')}>
-          {isLocked ? '🔒 TASKS' : 'TASKS'}
-        </button>
-        <button className={`nav-tab ${activeTab === 'dojo' ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-          onClick={() => !isLocked && setActiveTab('dojo')}>
-          {isLocked ? '🔒 DOJO' : 'DOJO'}
-        </button>
+        <button className={`nav-tab ${activeTab === 'tasks' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tasks')}>TASKS</button>
+        <button className={`nav-tab ${activeTab === 'dojo' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dojo')}>DOJO</button>
         <button className={`nav-tab ${activeTab === 'identity' ? 'active' : ''}`}
           onClick={() => setActiveTab('identity')}>IDENTITY</button>
       </nav>
@@ -383,6 +396,7 @@ export default function HomePage() {
                     onComplete={handleHabitComplete} 
                     onDelete={handleHabitDelete}
                     onEdit={(h) => setEditingItem({ item: h, type: 'habit' })}
+                    onUndo={handleUndoHabit}
                   />
                 ))
               )}
@@ -390,7 +404,7 @@ export default function HomePage() {
           </>
         )}
 
-        {activeTab === 'tasks' && !isLocked && (
+        {activeTab === 'tasks' && (
           <>
             {renderFilterBar()}
             <div className="section-header">
@@ -421,6 +435,7 @@ export default function HomePage() {
                     onFail={handleTaskFail} 
                     onDelete={handleTaskDelete}
                     onEdit={(t) => setEditingItem({ item: t, type: 'task' })}
+                    onUndo={handleUndoTask}
                   />
                 ))
               )}
@@ -428,7 +443,7 @@ export default function HomePage() {
           </>
         )}
 
-        {activeTab === 'dojo' && !isLocked && <DojoPanel />}
+        {activeTab === 'dojo' && <DojoPanel />}
         {activeTab === 'identity' && <IdentityPanel />}
       </main>
 

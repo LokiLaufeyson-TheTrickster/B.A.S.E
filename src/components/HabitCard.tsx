@@ -10,6 +10,7 @@ interface HabitCardProps {
   onComplete: (id: number) => void;
   onDelete: (id: number, clean?: boolean) => void;
   onEdit: (habit: Habit) => void;
+  onUndo: (id: number) => void;
 }
 
 function getRiskLabel(score: number) {
@@ -70,7 +71,19 @@ export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProp
         </div>
 
         {/* Actions */}
-        {!isCompleted && (
+        {isCompleted ? (
+          <button
+            onClick={() => habit.id && onUndo(habit.id)}
+            style={{
+              fontSize: '9px', fontWeight: 700, color: 'var(--gray-400)',
+              padding: '6px 12px', border: '1px solid var(--gray-300)',
+              borderRadius: 'var(--radius)', background: 'transparent',
+              cursor: 'pointer', marginRight: '8px'
+            }}
+          >
+            UNDO
+          </button>
+        ) : (
           <button
             onClick={() => setShowActions(!showActions)}
             title="More actions"

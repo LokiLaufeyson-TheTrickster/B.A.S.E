@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import type { Task } from '@/lib/db';
+import { db, type Task, type Habit } from '@/lib/db';
 import Executioner from './Executioner';
+import ThinkingPartner from './ThinkingPartner';
 
 interface TaskCardProps {
   task: Task;
@@ -10,9 +11,10 @@ interface TaskCardProps {
   onFail: (id: number) => void;
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
+  onUndo: (id: number) => void;
 }
 
-export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit }: TaskCardProps) {
+export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, onUndo }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const date = task.dueDate ? new Date(task.dueDate) : null;
@@ -39,6 +41,8 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit }:
     }
     return d.getTime() < now;
   })();
+
+  const [showTP, setShowTP] = React.useState(false);
 
   return (
     <div className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}>
@@ -71,7 +75,35 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit }:
       </div>
 
       {/* Actions */}
-      {!isCompleted && !isFailed && (
+      {isCompleted || isFailed ? (
+        <button
+          onClick={() => task.id && onUndo(task.id)}
+          style={{
+            fontSize: '9px', fontWeight: 700, color: 'var(--gray-400)',
+            padding: '6px 12px', border: '1px solid var(--gray-300)',
+            borderRadius: 'var(--radius)', background: 'transparent',
+            cursor: 'pointer', marginRight: '8px'
+          }}
+        >
+          UNDO
+        </button>
+      ) : (
+        <div style={{ display: 'flex', gap: '6px', marginRight: '8px' }}>
+          <button
+            onClick={() => setShowTP(true)}
+            style={{
+              fontSize: '9px', fontWeight: 700,
+              letterSpacing: '1px', textTransform: 'uppercase',
+              color: 'var(--crimson)', padding: '6px 10px',
+              border: '1px solid var(--crimson)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--crimson-glow)',
+              cursor: 'pointer',
+              transition: 'var(--transition)',
+            }}
+          >
+            EXPLAIN RISK
+          </button>
           <button
             onClick={() => onEdit(task)}
             style={{
@@ -128,6 +160,17 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit }:
         onComplete={() => task.id && onComplete(task.id)}
         completed={isCompleted || isFailed}
       />
+
+      {/* Thinking Partner for Task Risk */}
+      {showTP && (
+        <ThinkingPartner
+          habit={task as any} // Cast to any because ThinkingPartner expects Habit but handles Task context
+          onClose={() => setShowTP(false)}
+          onResolved={() => {
+            setShowTP(false);
+          }}
+        />
+      )}
     </div>
   );
 }
