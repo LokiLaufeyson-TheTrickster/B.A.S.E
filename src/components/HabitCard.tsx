@@ -33,7 +33,7 @@ function formatRecurrence(habit: Habit): string {
   }
 }
 
-export default function HabitCard({ habit, onComplete, onDelete }: HabitCardProps) {
+export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo }: HabitCardProps) {
   const risk = getRiskLabel(habit.riskScore);
   const isCompleted = habit.lastCompleted
     ? new Date(habit.lastCompleted).toDateString() === new Date().toDateString()
