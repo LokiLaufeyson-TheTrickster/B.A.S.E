@@ -278,8 +278,13 @@ ITEM_${i}:
 
 STABILITY GUIDELINES:
 - You are provided with the PREVIOUS RISK and PREVIOUS REASONING.
-- If the situation hasn't meaningfully changed (time passing, new failures/successes), MAINTAIN STABILITY. Avoid jumping from 10% to 50% without cause.
-- However, you are the final authority. You can absolutely go "apeshit" and double or half the risk if you detect a critical failure path or a major success, but your EXPLANATION better be solid and reflect why you are deviating from the previous baseline.
+- If the situation hasn't meaningfully changed (time passing, new failures/successes), MAINTAIN STABILITY.
+- You can change the score drastically if justified, but your explanation must be grounded in the data provided.
+
+CONTEXTUAL CONSTRAINTS:
+1. BINARY STATUS: This system is binary (Pending or Complete). There is no "partial progress" or "logs" for pending tasks. Do NOT mention "no progress logged" as it is redundant for a pending item.
+2. CLOSED UNIVERSE: Only consider the items provided in this list. Do NOT hallucinate "high current workload" or "busy schedule" unless the list actually contains a massive volume of high-priority items due today.
+3. DATA-ONLY: Base your risk strictly on time-to-deadline, priority, and past reliability metrics (resilience/streak).
 
 Items to analyze:
 ${itemsText}
