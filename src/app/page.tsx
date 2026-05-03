@@ -75,6 +75,63 @@ export default function HomePage() {
     setAiActive(hasAnyProvider());
   }, [loadData]);
 
+  // ── Background Risk Auditor (Real-time) ──────────────────────────────────────
+  useEffect(() => {
+    const auditorInterval = setInterval(async () => {
+      const allHabits = await db.habits.toArray();
+      const allTasks = await db.tasks.where('status').equals('pending').toArray();
+      const aiReady = hasAnyProvider();
+
+      // Audit Habits
+      for (const habit of allHabits) {
+        const { score } = await calculateRiskScore(habit);
+        const shouldExplain = aiReady && score > 0.7 && !habit.riskExplanation;
+        
+        if (score !== habit.riskScore || shouldExplain) {
+          let explanation = habit.riskExplanation;
+          if (shouldExplain) {
+            explanation = await explainRisk({
+              habitTitle: habit.title,
+              riskScore: score,
+              resilienceValue: habit.resilienceValue,
+              streakCount: habit.streakCount,
+              targetTime: habit.targetTime,
+              conversationHistory: [],
+            });
+          }
+          await db.habits.update(habit.id!, { riskScore: score, riskExplanation: explanation });
+        }
+      }
+
+      // Audit Tasks
+      for (const task of allTasks) {
+        const { calculateTaskRiskScore } = await import('@/lib/riskEngine');
+        const score = await calculateTaskRiskScore(task);
+        const shouldExplain = aiReady && score > 0.7 && !task.riskExplanation;
+
+        if (score !== task.riskScore || shouldExplain) {
+          let explanation = task.riskExplanation;
+          if (shouldExplain) {
+            explanation = await explainRisk({
+              habitTitle: task.title,
+              riskScore: score,
+              resilienceValue: 0,
+              streakCount: 0,
+              targetTime: task.dueDate ? new Date(task.dueDate).toLocaleTimeString() : 'N/A',
+              conversationHistory: [],
+              isTask: true
+            });
+          }
+          await db.tasks.update(task.id!, { riskScore: score, riskExplanation: explanation });
+        }
+      }
+      
+      loadData();
+    }, 60000); // Run every minute
+
+    return () => clearInterval(auditorInterval);
+  }, [loadData]);
+
   // ── All unique tags ──────────────────────────────────────────────────────────
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
