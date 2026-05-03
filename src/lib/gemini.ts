@@ -79,6 +79,8 @@ export interface ThinkingPartnerContext {
   conversationHistory: { role: 'user' | 'system'; content: string }[];
   isTask?: boolean;
   logsCount?: number;
+  lastRiskScore?: number;
+  lastRiskExplanation?: string;
 }
 
 function buildHabitContext(ctx: ThinkingPartnerContext): string {
@@ -260,10 +262,16 @@ ITEM_${i}:
 - Title: "${ctx.habitTitle}"
 - Context: ${buildHabitContext(ctx)}
 - Deadline: ${ctx.targetTime}
+- PREVIOUS RISK: ${(ctx.lastRiskScore || 0) * 100}%
+- PREVIOUS REASONING: "${ctx.lastRiskExplanation || 'N/A'}"
 `).join('\n---\n');
 
   const prompt = `You are a cold, data-driven AUDITOR. Analyze these ${items.length} items and predict a RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic for each.
-Be objective. 1.0=failure certain, 0.0=perfect.
+
+STABILITY GUIDELINES:
+- You are provided with the PREVIOUS RISK and PREVIOUS REASONING.
+- If the situation hasn't meaningfully changed (time passing, new failures/successes), MAINTAIN STABILITY. Avoid jumping from 10% to 50% without cause.
+- However, you are the final authority. You can absolutely go "apeshit" and double or half the risk if you detect a critical failure path or a major success, but your EXPLANATION better be solid and reflect why you are deviating from the previous baseline.
 
 Items to analyze:
 ${itemsText}

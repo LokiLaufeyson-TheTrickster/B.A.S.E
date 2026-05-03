@@ -146,7 +146,9 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           streakCount: habit.streakCount,
           targetTime: habit.targetTime,
           conversationHistory: [],
-          logsCount
+          logsCount,
+          lastRiskScore: habit.riskScore,
+          lastRiskExplanation: habit.riskExplanation
         }
       });
     } else if (habit.riskScore > 0.7) {
@@ -170,7 +172,9 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           streakCount: 0,
           targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
           conversationHistory: [],
-          isTask: true
+          isTask: true,
+          lastRiskScore: task.riskScore,
+          lastRiskExplanation: task.riskExplanation
         }
       });
     } else if (task.riskScore > 0.7) {
