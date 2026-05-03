@@ -18,6 +18,12 @@ export function normalizeBatchResponse(parsed: any): any[] {
     if (Array.isArray(parsed[key])) return parsed[key];
   }
   
+  // Look for keyed objects (ID_0, ID_1, etc.)
+  const firstKey = Object.keys(parsed)[0];
+  if (firstKey && (firstKey.startsWith('ID_') || firstKey === '0')) {
+    return Object.values(parsed);
+  }
+  
   // If no obvious array, return the object itself as a single-item list
   return [parsed];
 }

@@ -256,42 +256,37 @@ export interface RiskAnalysis {
 export async function analyzeRiskBatch(items: ThinkingPartnerContext[]): Promise<RiskAnalysis[]> {
   if (items.length === 0) return [];
   
-  // Limit batch size for reliability
   const MAX_BATCH = 5;
   if (items.length > MAX_BATCH) {
-    const chunk1 = await analyzeRiskBatch(items.slice(0, MAX_BATCH));
-    const chunk2 = await analyzeRiskBatch(items.slice(MAX_BATCH));
-    return [...chunk1, ...chunk2];
+    // Process chunks in parallel
+    const chunks: ThinkingPartnerContext[][] = [];
+    for (let i = 0; i < items.length; i += MAX_BATCH) {
+      chunks.push(items.slice(i, i + MAX_BATCH));
+    }
+    const results = await Promise.all(chunks.map(c => analyzeRiskBatch(c)));
+    return results.flat();
   }
 
   const itemsText = items.map((ctx, i) => `
-ITEM_${i}:
-- Type: ${ctx.isTask ? 'Task' : 'Habit'}
+ID_${i}:
 - Title: "${ctx.habitTitle}"
 - Context: ${buildHabitContext(ctx)}
 - Deadline: ${ctx.targetTime}
-- PREVIOUS RISK: ${(ctx.lastRiskScore || 0) * 100}%
-- PREVIOUS REASONING: "${ctx.lastRiskExplanation || 'N/A'}"
+- PREVIOUS: ${(ctx.lastRiskScore || 0) * 100}% | "${ctx.lastRiskExplanation || 'N/A'}"
 `).join('\n---\n');
 
-  const prompt = `You are a cold, data-driven AUDITOR. Analyze these ${items.length} items and predict a RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic for each.
+  const prompt = `You are a cold, data-driven AUDITOR. Analyze these ${items.length} items.
+For each ID, provide a RISK SCORE (0.0-1.0) and a ONE-SENTENCE diagnostic.
 
-STABILITY GUIDELINES:
-- You are provided with the PREVIOUS RISK and PREVIOUS REASONING.
-- If the situation hasn't meaningfully changed (time passing, new failures/successes), MAINTAIN STABILITY.
-- You can change the score drastically if justified, but your explanation must be grounded in the data provided.
-
-CONTEXTUAL CONSTRAINTS:
-1. BINARY STATUS: This system is binary (Pending or Complete). There is no "partial progress" or "logs" for pending tasks. Do NOT mention "no progress logged" as it is redundant for a pending item.
-2. CLOSED UNIVERSE: Only consider the items provided in this list. Do NOT hallucinate "high current workload" or "busy schedule" unless the list actually contains a massive volume of high-priority items due today.
-3. DATA-ONLY: Base your risk strictly on time-to-deadline, priority, and past reliability metrics (resilience/streak).
-
-Items to analyze:
+Items:
 ${itemsText}
 
-Response MUST be a JSON array of EXACTLY ${items.length} objects. Do NOT return a single object. 
-Example Format: [ {"score": 0.1, "explanation": "..."}, {"score": 0.5, "explanation": "..."} ]
-The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
+Response MUST be a JSON object where keys are the IDs (ID_0, ID_1, etc.).
+Example:
+{
+  "ID_0": { "score": 0.1, "explanation": "..." },
+  "ID_1": { "score": 0.5, "explanation": "..." }
+}`;
 
   // 1. Try Gemini
   const apiKey = getGeminiKey();
@@ -317,11 +312,12 @@ The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (text) {
           const parsed = extractJSON(text);
-          const items = normalizeBatchResponse(parsed);
-          if (items.length > 0) {
-            await logDebug('gemini', 'gemini-2.5-flash (batch)', prompt, text);
-            return items.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
-          }
+          await logDebug('gemini', 'gemini-2.5-flash (batch)', prompt, text);
+          
+          return items.map((_, i) => {
+            const entry = parsed[`ID_${i}`] || parsed[i] || Object.values(parsed)[i] || {};
+            return { score: Number(entry.score) || 0, explanation: String(entry.explanation || "") };
+          });
         }
       }
     } catch (e) {
@@ -354,11 +350,12 @@ The order MUST match the input items (ITEM_0 to ITEM_${items.length - 1}).`;
           const text = data.choices?.[0]?.message?.content?.trim();
           if (text) {
             const parsed = extractJSON(text);
-            const items = normalizeBatchResponse(parsed);
-            if (items.length > 0) {
-              await logDebug('openrouter', `${model} (batch)`, prompt, text);
-              return items.map(p => ({ score: Number(p.score) || 0, explanation: String(p.explanation || "") }));
-            }
+            await logDebug('openrouter', `${model} (batch)`, prompt, text);
+            
+            return items.map((_, i) => {
+              const entry = parsed[`ID_${i}`] || parsed[i] || Object.values(parsed)[i] || {};
+              return { score: Number(entry.score) || 0, explanation: String(entry.explanation || "") };
+            });
           }
         }
       } catch {}
