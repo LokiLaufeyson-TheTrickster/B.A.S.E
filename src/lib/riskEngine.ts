@@ -44,8 +44,8 @@ function getDueDateMinutes(dueDate: number | null): number {
 
 // ── Core Engine ────────────────────────────────────────────────────────────────
 
-export async function calculateRiskScore(habit: Habit): Promise<number> {
-  if (!habit.id) return 0;
+export async function calculateRiskScore(habit: Habit): Promise<{ score: number, logsCount: number }> {
+  if (!habit.id) return { score: 0, logsCount: 0 };
 
   const now = Date.now();
   const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
@@ -60,7 +60,7 @@ export async function calculateRiskScore(habit: Habit): Promise<number> {
 
   if (recentLogs.length === 0) {
     // New habit or no recent data → No risk yet.
-    return 0;
+    return { score: 0, logsCount: 0 };
   }
 
   const targetMinutes = timeToMinutes(habit.targetTime);
@@ -95,7 +95,8 @@ export async function calculateRiskScore(habit: Habit): Promise<number> {
   const Rs = ((driftToday + avgDrift3d) / DRIFT_THRESHOLD_MINUTES) * Math.log(volatility + Math.E);
 
   // Clamp to 0-1 range
-  return Math.min(Math.max(Rs, 0), 1);
+  const score = Math.min(Math.max(Rs, 0), 1);
+  return { score, logsCount: recentLogs.length };
 }
 
 export async function calculateTaskRiskScore(task: Task): Promise<number> {
@@ -130,7 +131,7 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
       continue;
     }
 
-    const riskScore = await calculateRiskScore(habit);
+    const { score: riskScore, logsCount } = await calculateRiskScore(habit);
     const isBreached = riskScore > BREACH_THRESHOLD;
     let riskExplanation = habit.riskExplanation;
 
@@ -142,7 +143,7 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
         streakCount: habit.streakCount,
         targetTime: habit.targetTime,
         conversationHistory: [],
-        logsCount: recentLogs.length // Pass count to AI
+        logsCount: logsCount // Pass count to AI
       });
     }
 
