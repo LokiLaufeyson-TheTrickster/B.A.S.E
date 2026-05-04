@@ -48,55 +48,66 @@ export async function calculateRiskScore(habit: Habit): Promise<{ score: number,
   if (!habit.id) return { score: 0, logsCount: 0 };
 
   const now = Date.now();
+  
+  // 0. ABSOLUTE ZERO: If completed today, risk is 0. No exceptions.
+  if (habit.lastCompleted && new Date(habit.lastCompleted).toDateString() === new Date(now).toDateString()) {
+    return { score: 0, logsCount: 0 };
+  }
+
   const threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000;
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  // Fetch recent logs
-  const recentLogs = await db.logs
+  const logs = await db.logs
     .where('habitId')
     .equals(habit.id)
     .and(log => log.timestamp > sevenDaysAgo)
     .sortBy('timestamp');
 
-  if (recentLogs.length === 0) {
-    // New habit or no recent data → No risk yet.
-    return { score: 0, logsCount: 0 };
-  }
-
   const targetMinutes = timeToMinutes(habit.targetTime);
+  const currentMinutes = timestampToMinutes(now);
 
-  // Calculate today's drift
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayLogs = recentLogs.filter(l => l.timestamp >= todayStart.getTime());
+  // 1. BASELINE DRIFT (Last 7 Days)
+  const drift7d = logs.length > 0 
+    ? logs.reduce((a, b) => a + Math.abs(b.jitterValue), 0) / logs.length 
+    : 0;
+
+  // 2. MOMENTUM (Last 3 Days vs Last 7 Days)
+  // If recent drift is higher than average, we are in "Discipline Decay"
+  const logs3d = logs.filter(l => l.timestamp > threeDaysAgo);
+  const drift3d = logs3d.length > 0
+    ? logs3d.reduce((a, b) => a + Math.abs(b.jitterValue), 0) / logs3d.length
+    : drift7d;
   
-  let driftToday = 0;
-  if (todayLogs.length > 0) {
-    const latestToday = todayLogs[todayLogs.length - 1];
-    driftToday = Math.abs(timestampToMinutes(latestToday.timestamp) - targetMinutes);
+  const momentum = drift3d > drift7d ? 1.5 : 0.8; // 50% penalty for worsening trend
+  
+  // 3. DEADLINE GRAVITY
+  // Sigmoid-like curve: Risk is low until ~2 hours before, then spikes.
+  const minutesToDeadline = targetMinutes - currentMinutes;
+  let gravity = 1.0;
+  
+  if (minutesToDeadline > 240) { // > 4 hours
+    gravity = 0.2;
+  } else if (minutesToDeadline > 0) {
+    // Smooth curve from 0.2 to 1.0 as we approach deadline
+    gravity = 0.2 + (0.8 * Math.pow(1 - (minutesToDeadline / 240), 2));
   } else {
-    // Not done today → drift = current time - target time (if past target)
-    const currentMinutes = timestampToMinutes(now);
-    if (currentMinutes > targetMinutes) {
-      driftToday = currentMinutes - targetMinutes;
-    }
+    // Overdue: Gravity escalates rapidly
+    const minutesOverdue = Math.abs(minutesToDeadline);
+    gravity = 1.0 + (minutesOverdue / 60); 
   }
 
-  // Average drift over last 3 days
-  const threeDayLogs = recentLogs.filter(l => l.timestamp > threeDaysAgo);
-  const drifts = threeDayLogs.map(l => Math.abs(timestampToMinutes(l.timestamp) - targetMinutes));
-  const avgDrift3d = drifts.length > 0 ? drifts.reduce((a, b) => a + b, 0) / drifts.length : driftToday;
+  // 4. STREAK PROTECTION (Armor)
+  // Every 5 days of streak reduces risk by 5%, max 25% reduction.
+  const armor = Math.max(0.75, 1 - (habit.streakCount * 0.01));
 
-  // Volatility: stddev of last 7 execution times  
-  const execMinutes = recentLogs.map(l => timestampToMinutes(l.timestamp));
-  const volatility = stdDev(execMinutes);
-
-  // Risk Score Formula
-  const Rs = ((driftToday + avgDrift3d) / DRIFT_THRESHOLD_MINUTES) * Math.log(volatility + Math.E);
+  // 5. FINAL CALCULATION (Deterministic Vector)
+  // Risk = (Average Drift / Threshold) * Momentum * Gravity * Armor
+  const baseRisk = (drift7d / DRIFT_THRESHOLD_MINUTES);
+  const Rs = baseRisk * momentum * gravity * armor;
 
   // Clamp to 0-1 range
   const score = Math.min(Math.max(Rs, 0), 1);
-  return { score, logsCount: recentLogs.length };
+  return { score, logsCount: logs.length };
 }
 
 export async function calculateTaskRiskScore(task: Task): Promise<number> {
@@ -116,7 +127,10 @@ export async function calculateTaskRiskScore(task: Task): Promise<number> {
   // If within 24 hours, risk increases
   const baseRisk = (5 - task.priority) * 0.1;
   const timeFactor = 1 - (hoursLeft / 24); // 0 at 24h, 1 at 0h
-  const risk = baseRisk + (0.95 - baseRisk) * Math.pow(timeFactor, 1.5); 
+  
+  // Dampen task risk if many hours left
+  const dampen = hoursLeft > 12 ? 0.3 : hoursLeft > 6 ? 0.6 : 1.0;
+  const risk = (baseRisk + (0.95 - baseRisk) * Math.pow(timeFactor, 1.5)) * dampen; 
 
   return Math.min(0.95, risk);
 }
@@ -132,6 +146,19 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
 
   // 1. Filter Habits
   for (const habit of habits) {
+    const isCompleted = habit.lastCompleted && new Date(habit.lastCompleted).toDateString() === new Date().toDateString();
+    
+    if (isCompleted) {
+      // Auto-clear for completed habits
+      await db.habits.update(habit.id!, { 
+        riskScore: 0, 
+        isBreached: false, 
+        riskExplanation: "Goal achieved for today.", 
+        lastRiskAudit: Date.now() 
+      });
+      continue;
+    }
+
     const { score: riskScore, logsCount } = await calculateRiskScore(habit);
     const needsAudit = force || !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > twentyMins);
     
@@ -147,6 +174,7 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           targetTime: habit.targetTime,
           conversationHistory: [],
           logsCount,
+          isCompleted: false,
           lastRiskScore: habit.riskScore,
           lastRiskExplanation: habit.riskExplanation
         }
@@ -173,6 +201,7 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
           conversationHistory: [],
           isTask: true,
+          isCompleted: task.status === 'completed',
           lastRiskScore: task.riskScore,
           lastRiskExplanation: task.riskExplanation
         }
@@ -182,29 +211,30 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
     }
   }
 
-  // 3. Execute Batch Audit
+  // 3. Execute Batch Audit (Explanations Only)
   if (auditQueue.length > 0) {
     const results = await analyzeRiskBatch(auditQueue.map(q => q.ctx));
     for (let i = 0; i < auditQueue.length; i++) {
       const q = auditQueue[i];
       const res = results[i];
+      const deterministicScore = q.ctx.riskScore; // Use the score we calculated mathematically
       
       if (q.isTask) {
         await db.tasks.update(q.item.id!, { 
-          riskScore: res.score, 
+          riskScore: deterministicScore, 
           riskExplanation: res.explanation, 
           lastRiskAudit: Date.now() 
         });
-        if (res.score > 0.7) riskyTasks.push({ ...(q.item as Task), riskScore: res.score, riskExplanation: res.explanation });
+        if (deterministicScore > 0.7) riskyTasks.push({ ...(q.item as Task), riskScore: deterministicScore, riskExplanation: res.explanation });
       } else {
         const h = q.item as Habit;
         await db.habits.update(h.id!, { 
-          riskScore: res.score, 
+          riskScore: deterministicScore, 
           riskExplanation: res.explanation, 
           lastRiskAudit: Date.now(),
-          isBreached: res.score > BREACH_THRESHOLD
+          isBreached: deterministicScore > BREACH_THRESHOLD
         });
-        if (res.score > 0.7) breachedHabits.push({ ...h, riskScore: res.score, riskExplanation: res.explanation });
+        if (deterministicScore > 0.7) breachedHabits.push({ ...h, riskScore: deterministicScore, riskExplanation: res.explanation });
       }
     }
   }

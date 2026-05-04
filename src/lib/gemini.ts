@@ -78,6 +78,7 @@ export interface ThinkingPartnerContext {
   targetTime: string;
   conversationHistory: { role: 'user' | 'system'; content: string }[];
   isTask?: boolean;
+  isCompleted?: boolean;
   logsCount?: number;
   lastRiskScore?: number;
   lastRiskExplanation?: string;
@@ -87,12 +88,14 @@ function buildHabitContext(ctx: ThinkingPartnerContext): string {
   if (ctx.isTask) {
     return `CURRENT TASK DATA:
 - Task: "${ctx.habitTitle}"
+- Status: ${ctx.isCompleted ? 'COMPLETED' : 'PENDING'}
 - Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
 - Target Time: ${ctx.targetTime}
 - Current Time: ${new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
   }
   return `CURRENT HABIT DATA:
 - Habit: "${ctx.habitTitle}"
+- Status: ${ctx.isCompleted ? 'COMPLETED TODAY' : 'NOT YET COMPLETED TODAY'}
 - Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
 - Resilience: ${ctx.resilienceValue}%
 - Current Streak: ${ctx.streakCount} days
@@ -275,8 +278,15 @@ ID_${i}:
 - PREVIOUS: ${(ctx.lastRiskScore || 0) * 100}% | "${ctx.lastRiskExplanation || 'N/A'}"
 `).join('\n---\n');
 
-  const prompt = `You are a cold, data-driven AUDITOR. Analyze these ${items.length} items.
-For each ID, provide a RISK SCORE (0.0-1.0) and a ONE-SENTENCE diagnostic.
+  const prompt = `You are a hostile, data-driven AUDITOR. I have calculated the RISK SCORES for these ${items.length} items using a mathematical discipline-decay formula. 
+Your job is to provide a ONE-SENTENCE diagnostic for each ID. 
+
+Rules for your diagnostic:
+1. Be hostile, aggressive, and data-focused.
+2. Reference their risk score (e.g. "Your 85% risk score proves your lack of discipline.").
+3. If risk is 0%, be dismissive but briefly acknowledge the completion.
+4. If risk is high (>70%), mock their excuses and demand execution.
+5. Keep it to EXACTLY one sentence.
 
 Items:
 ${itemsText}
@@ -284,8 +294,8 @@ ${itemsText}
 Response MUST be a JSON object where keys are the IDs (ID_0, ID_1, etc.).
 Example:
 {
-  "ID_0": { "score": 0.1, "explanation": "..." },
-  "ID_1": { "score": 0.5, "explanation": "..." }
+  "ID_0": { "explanation": "Goal achieved; don't expect a medal." },
+  "ID_1": { "explanation": "Risk at 90% because your historical jitter proves you are incapable of punctuality." }
 }`;
 
   // 1. Try Gemini
@@ -314,9 +324,9 @@ Example:
           const parsed = extractJSON(text);
           await logDebug('gemini', 'gemini-2.5-flash (batch)', prompt, text);
           
-          return items.map((_, i) => {
+          return items.map((ctx, i) => {
             const entry = parsed[`ID_${i}`] || parsed[i] || Object.values(parsed)[i] || {};
-            return { score: Number(entry.score) || 0, explanation: String(entry.explanation || "") };
+            return { score: ctx.riskScore, explanation: String(entry.explanation || "") };
           });
         }
       }
@@ -352,9 +362,9 @@ Example:
             const parsed = extractJSON(text);
             await logDebug('openrouter', `${model} (batch)`, prompt, text);
             
-            return items.map((_, i) => {
+            return items.map((ctx, i) => {
               const entry = parsed[`ID_${i}`] || parsed[i] || Object.values(parsed)[i] || {};
-              return { score: Number(entry.score) || 0, explanation: String(entry.explanation || "") };
+              return { score: ctx.riskScore, explanation: String(entry.explanation || "") };
             });
           }
         }
@@ -367,15 +377,18 @@ Example:
 }
 
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {
-  const prompt = `You are a cold, data-driven AUDITOR. Analyze this ${ctx.isTask ? 'task' : 'habit'} and predict the RISK SCORE (0.0 to 1.0) and a ONE-SENTENCE diagnostic.
-A score of 1.0 means failure is certain. 0.0 means perfect trajectory.
-Be objective. If they have plenty of time, don't be pessimistic.
+  const prompt = `You are a hostile, data-driven AUDITOR. I have calculated a RISK SCORE of ${(ctx.riskScore * 100).toFixed(0)}% for this ${ctx.isTask ? 'task' : 'habit'}.
+Your job: provide a ONE-SENTENCE diagnostic explaining this risk.
+
+Rules:
+1. Be aggressive and reference the data provided.
+2. If the score is 0%, be cold but acknowledge completion.
+3. If the score is high, interrogate their failure.
+4. Response MUST be a JSON object with a single key "explanation" (string).
 
 Data:
 ${buildHabitContext(ctx)}
-${ctx.isTask ? `- Deadline Date: ${ctx.targetTime}` : ''}
-
-Response MUST be a JSON object with keys "score" (number) and "explanation" (string).`;
+${ctx.isTask ? `- Deadline Date: ${ctx.targetTime}` : ''}`;
 
   // 1. Try Gemini
   const apiKey = getGeminiKey();
@@ -401,9 +414,9 @@ Response MUST be a JSON object with keys "score" (number) and "explanation" (str
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (text) {
           const parsed = extractJSON(text);
-          if (parsed && typeof parsed.score !== 'undefined') {
+          if (parsed && typeof parsed.explanation !== 'undefined') {
             await logDebug('gemini', 'gemini-2.5-flash (analyze)', prompt, text);
-            return { score: Number(parsed.score) || 0, explanation: String(parsed.explanation || "") };
+            return { score: ctx.riskScore, explanation: String(parsed.explanation || "") };
           }
         }
       }
