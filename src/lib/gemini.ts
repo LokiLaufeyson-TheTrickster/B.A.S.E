@@ -278,15 +278,15 @@ ID_${i}:
 - PREVIOUS: ${(ctx.lastRiskScore || 0) * 100}% | "${ctx.lastRiskExplanation || 'N/A'}"
 `).join('\n---\n');
 
-  const prompt = `You are a clinical, data-driven RISK ANALYST. I have calculated the RISK SCORES for these ${items.length} items using a mathematical formula. 
-Your job is to provide a ONE-SENTENCE technical diagnostic for each ID.
+  const prompt = `You are a cold, stern AUDITOR. I have calculated the RISK SCORES for these ${items.length} items using a mathematical formula. 
+Your job is to provide a ONE-SENTENCE diagnostic for each ID.
 
 Rules for your diagnostic:
-1. Be professional, objective, and analytical. Focus on the data.
-2. Explain the risk score based on the provided context (e.g. "Risk is driven by a 45-minute average drift and high execution volatility.").
-3. If risk is 0%, acknowledge completion clearly and professionally.
-4. If risk is high, identify the specific behavioral vector causing it (e.g. deadline proximity or momentum loss).
-5. Keep it to EXACTLY one sentence. No insults. No fluff.
+1. Be cold, strict, and data-focused. Don't use insults, but don't be "friendly."
+2. Explain the risk score based on the data (e.g. "A 45-minute drift pattern makes this 85% risk unavoidable.").
+3. If risk is 0%, acknowledge completion coldly. 
+4. If risk is high, pinpoint the failure vector with a tone of disappointment (e.g. "Your momentum is decaying as the deadline approaches.").
+5. Keep it to EXACTLY one sentence.
 
 Items:
 ${itemsText}
@@ -294,8 +294,8 @@ ${itemsText}
 Response MUST be a JSON object where keys are the IDs (ID_0, ID_1, etc.).
 Example:
 {
-  "ID_0": { "explanation": "Goal achieved; trajectory stabilized." },
-  "ID_1": { "explanation": "90% risk is due to a pattern of increasing jitter and an imminent deadline." }
+  "ID_0": { "explanation": "Target met; remain vigilant." },
+  "ID_1": { "explanation": "Risk at 90% because you are deviating significantly from your historical performance." }
 }`;
 
   // 1. Try Gemini
@@ -377,13 +377,13 @@ Example:
 }
 
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {
-  const prompt = `You are a clinical, data-driven RISK ANALYST. I have calculated a RISK SCORE of ${(ctx.riskScore * 100).toFixed(0)}% for this ${ctx.isTask ? 'task' : 'habit'}.
-Your job: provide a ONE-SENTENCE technical diagnostic explaining this specific risk level.
+  const prompt = `You are a cold, stern AUDITOR. I have calculated a RISK SCORE of ${(ctx.riskScore * 100).toFixed(0)}% for this ${ctx.isTask ? 'task' : 'habit'}.
+Your job: provide a ONE-SENTENCE stern diagnostic explaining this specific risk level.
 
 Rules:
-1. Be professional and objective. Focus on the data (streak, drift, momentum, deadline).
-2. If the score is 0%, state that the goal is achieved.
-3. If the score is high, pinpoint the primary driver (e.g., proximity to deadline or historical drift).
+1. Be cold and strict. Reference the data (streak, drift, momentum, deadline).
+2. If the score is 0%, state that the target was met.
+3. If the score is high, pinpoint why you are disappointed in the trajectory.
 4. Response MUST be a JSON object with a single key "explanation" (string).
 
 Data:
