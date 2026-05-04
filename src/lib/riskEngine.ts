@@ -124,29 +124,20 @@ export async function calculateRiskScore(habit: Habit): Promise<{
   };
 }
 
-export async function calculateTaskRiskScore(task: Task): Promise<number> {
+export async function calculateTaskRiskScore(task: Task): Promise<{ score: number, gravity: number }> {
+  if (task.status !== 'pending' || !task.dueDate) return { score: 0, gravity: 0 };
+  
   const now = Date.now();
-  if (!task.dueDate) return 0.2 * (5 - task.priority);
-
   const timeLeft = task.dueDate - now;
   const hoursLeft = timeLeft / (1000 * 60 * 60);
 
-  if (timeLeft < 0) return 1.0; // Overdue is critical
-  
-  // If more than 24 hours away, risk is low, priority based
-  if (hoursLeft > 24) {
-    return Math.max(0.1, (5 - task.priority) * 0.08);
-  }
-
-  // If within 24 hours, risk increases
-  const baseRisk = (5 - task.priority) * 0.1;
-  const timeFactor = 1 - (hoursLeft / 24); // 0 at 24h, 1 at 0h
+  if (timeLeft < 0) return { score: 0.95, gravity: 1.0 }; // Overdue is critical
   
   // Dampen task risk if many hours left
-  const dampen = hoursLeft > 12 ? 0.3 : hoursLeft > 6 ? 0.6 : 1.0;
-  const risk = (baseRisk + (0.95 - baseRisk) * Math.pow(timeFactor, 1.5)) * dampen; 
+  const gravity = hoursLeft > 12 ? 0.3 : hoursLeft > 6 ? 0.6 : (0.3 + 0.7 * Math.pow(1 - hoursLeft/12, 2));
+  const score = Math.min(0.95, gravity);
 
-  return Math.min(0.95, risk);
+  return { score, gravity };
 }
 
 /**
@@ -159,16 +150,23 @@ export async function syncAllRisks(): Promise<void> {
   const tasks = await db.tasks.where('status').equals('pending').toArray();
 
   for (const habit of habits) {
-    const { score } = await calculateRiskScore(habit);
+    const { score, momentum, gravity, armor, avgJitter } = await calculateRiskScore(habit);
     await db.habits.update(habit.id!, { 
       riskScore: score,
-      isBreached: score > BREACH_THRESHOLD 
+      isBreached: score > BREACH_THRESHOLD,
+      momentum,
+      gravity,
+      armor,
+      avgJitter
     });
   }
 
   for (const task of tasks) {
-    const score = await calculateTaskRiskScore(task);
-    await db.tasks.update(task.id!, { riskScore: score });
+    const { score, gravity } = await calculateTaskRiskScore(task);
+    await db.tasks.update(task.id!, { 
+      riskScore: score,
+      gravity
+    });
   }
 }
 
@@ -261,19 +259,25 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
     for (let i = 0; i < auditQueue.length; i++) {
       const q = auditQueue[i];
       const res = results[i];
-      const deterministicScore = q.ctx.riskScore; // Use the score we calculated mathematically
+      const { score: deterministicScore, momentum, gravity, armor, avgJitter } = await calculateRiskScore(q.item as Habit); // Recalculate or use from ctx
       
       if (q.isTask) {
+        const { score: tScore, gravity: tGravity } = await calculateTaskRiskScore(q.item as Task);
         await db.tasks.update(q.item.id!, { 
-          riskScore: deterministicScore, 
+          riskScore: tScore, 
+          gravity: tGravity,
           riskExplanation: res.explanation, 
           lastRiskAudit: Date.now() 
         });
-        if (deterministicScore > 0.7) riskyTasks.push({ ...(q.item as Task), riskScore: deterministicScore, riskExplanation: res.explanation });
+        if (tScore > 0.7) riskyTasks.push({ ...(q.item as Task), riskScore: tScore, riskExplanation: res.explanation });
       } else {
         const h = q.item as Habit;
         await db.habits.update(h.id!, { 
           riskScore: deterministicScore, 
+          momentum,
+          gravity,
+          armor,
+          avgJitter,
           riskExplanation: res.explanation, 
           lastRiskAudit: Date.now(),
           isBreached: deterministicScore > BREACH_THRESHOLD

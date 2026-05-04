@@ -17,6 +17,10 @@ export interface Habit {
   lastCompleted: number | null;
   riskExplanation?: string;
   lastRiskAudit?: number;
+  momentum?: number;
+  gravity?: number;
+  armor?: number;
+  avgJitter?: number;
 }
 
 export interface RecurrenceRule {
@@ -37,6 +41,10 @@ export interface Task {
   riskScore: number;
   riskExplanation?: string;
   lastRiskAudit?: number;
+  momentum?: number;
+  gravity?: number;
+  armor?: number;
+  avgJitter?: number;
 }
 
 export interface DojoTrack {

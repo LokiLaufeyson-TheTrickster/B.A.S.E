@@ -42,6 +42,7 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo,
   const [showTP, setShowTP] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [isPeeking, setIsPeeking] = useState(false);
 
   return (
     <>
@@ -55,11 +56,62 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo,
             <span 
               className={`item-risk ${risk.className}`} 
               onClick={() => setExpanded(!expanded)}
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              onMouseEnter={() => setIsPeeking(true)}
+              onMouseLeave={() => setIsPeeking(false)}
+              onMouseDown={() => setIsPeeking(true)}
+              onMouseUp={() => setIsPeeking(false)}
+              onTouchStart={() => setIsPeeking(true)}
+              onTouchEnd={() => setIsPeeking(false)}
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', position: 'relative' }}
             >
               RISK: {risk.text}
               {habit.riskExplanation && (
                 <span style={{ fontSize: '8px', opacity: 0.7 }}>{expanded ? '▲' : '▼'}</span>
+              )}
+
+              {isPeeking && !isCompleted && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: '0', zIndex: 100,
+                  background: 'var(--black)', border: '1px solid var(--gray-300)',
+                  padding: '12px', borderRadius: 'var(--radius)',
+                  minWidth: '180px', marginTop: '12px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                  pointerEvents: 'none'
+                }}>
+                  <div style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--gray-500)', marginBottom: '8px', textTransform: 'uppercase' }}>Trajectory Metrics</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                      <span style={{ color: 'var(--gray-400)' }}>Trend (Momentum):</span>
+                      <span style={{ color: habit.momentum && habit.momentum > 1 ? 'var(--crimson)' : 'var(--green)' }}>
+                        {habit.momentum && habit.momentum > 1 ? 'Decaying' : 'Stable'} ({habit.momentum?.toFixed(1) || '1.0'}x)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                      <span style={{ color: 'var(--gray-400)' }}>Pressure (Gravity):</span>
+                      <span style={{ color: habit.gravity && habit.gravity > 0.5 ? 'var(--amber)' : 'var(--gray-500)' }}>
+                        {habit.gravity?.toFixed(2) || '0.2'}x
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                      <span style={{ color: 'var(--gray-400)' }}>Armor (Streak):</span>
+                      <span style={{ color: 'var(--green)' }}>
+                        -{((1 - (habit.armor || 1)) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                      <span style={{ color: 'var(--gray-400)' }}>Avg Delay:</span>
+                      <span style={{ color: 'var(--white)' }}>
+                        {habit.avgJitter || 0}m
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ 
+                    marginTop: '10px', pt: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', 
+                    fontSize: '8px', color: 'var(--gray-500)', fontStyle: 'italic'
+                  }}>
+                    Formula: (Drift / 30) × Momentum × Gravity × Armor
+                  </div>
+                </div>
               )}
             </span>
           </div>
