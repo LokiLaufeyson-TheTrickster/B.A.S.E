@@ -228,7 +228,9 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
 
   // 2. Filter Tasks
   for (const task of tasks) {
-    const riskScore = await calculateTaskRiskScore(task);
+    const taskRiskRes = await calculateTaskRiskScore(task);
+    const riskScore = taskRiskRes.score;
+    const gravity = taskRiskRes.gravity;
     const needsAudit = force || !task.lastRiskAudit || (Date.now() - task.lastRiskAudit > twentyMins);
 
     if (needsAudit) {
@@ -245,7 +247,8 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           isTask: true,
           isCompleted: task.status === 'completed',
           lastRiskScore: task.riskScore,
-          lastRiskExplanation: task.riskExplanation
+          lastRiskExplanation: task.riskExplanation,
+          gravity
         }
       });
     } else if (task.riskScore > 0.7) {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
-import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore, syncAllRisks } from '@/lib/riskEngine';
+import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore, calculateTaskRiskScore, syncAllRisks } from '@/lib/riskEngine';
 import { hasAnyProvider, analyzeRisk } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
@@ -236,15 +236,18 @@ export default function HomePage() {
   const handleExplainTask = async (task: Task) => {
     if (!task.id) return;
     
+    const { score: riskScore, gravity } = await calculateTaskRiskScore(task);
+    
     // We already have riskScore from DB or we can recalculate
     const analysis = await analyzeRisk({
       habitTitle: task.title,
-      riskScore: task.riskScore,
+      riskScore,
       resilienceValue: 0,
       streakCount: 0,
       targetTime: task.dueDate ? new Date(task.dueDate).toLocaleString() : 'N/A',
       conversationHistory: [],
-      isTask: true
+      isTask: true,
+      gravity
     });
 
     await db.tasks.update(task.id, { 
