@@ -81,25 +81,25 @@ export default function HabitCard({ habit, onComplete, onDelete, onEdit, onUndo,
                   <div style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--gray-500)', marginBottom: '8px', textTransform: 'uppercase' }}>Trajectory Metrics</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ color: 'var(--gray-400)' }}>Trend (Momentum):</span>
+                      <span style={{ color: 'var(--gray-400)' }}>Consistency Trend:</span>
                       <span style={{ color: habit.momentum && habit.momentum > 1 ? 'var(--crimson)' : 'var(--green)' }}>
-                        {habit.momentum && habit.momentum > 1 ? 'Decaying' : 'Stable'} ({habit.momentum?.toFixed(1) || '1.0'}x)
+                        {habit.momentum && habit.momentum > 1 ? 'Declining' : 'Stable'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ color: 'var(--gray-400)' }}>Pressure (Gravity):</span>
+                      <span style={{ color: 'var(--gray-400)' }}>Deadline Urgency:</span>
                       <span style={{ color: habit.gravity && habit.gravity > 0.5 ? 'var(--amber)' : 'var(--gray-500)' }}>
-                        {habit.gravity?.toFixed(2) || '0.2'}x
+                        {habit.gravity && habit.gravity > 0.5 ? 'High' : 'Normal'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ color: 'var(--gray-400)' }}>Armor (Streak):</span>
+                      <span style={{ color: 'var(--gray-400)' }}>Streak Bonus:</span>
                       <span style={{ color: 'var(--green)' }}>
                         -{((1 - (habit.armor || 1)) * 100).toFixed(0)}%
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ color: 'var(--gray-400)' }}>Avg Delay:</span>
+                      <span style={{ color: 'var(--gray-400)' }}>Average Lateness:</span>
                       <span style={{ color: 'var(--white)' }}>
                         {habit.avgJitter || 0}m
                       </span>

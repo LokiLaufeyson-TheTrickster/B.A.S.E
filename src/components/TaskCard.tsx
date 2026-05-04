@@ -89,9 +89,9 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
                   <div style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--gray-500)', marginBottom: '8px', textTransform: 'uppercase' }}>Trajectory Metrics</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                      <span style={{ color: 'var(--gray-400)' }}>Pressure (Gravity):</span>
+                      <span style={{ color: 'var(--gray-400)' }}>Deadline Urgency:</span>
                       <span style={{ color: task.gravity && task.gravity > 0.5 ? 'var(--amber)' : 'var(--gray-500)' }}>
-                        {task.gravity?.toFixed(2) || '0.3'}x
+                        {task.gravity && task.gravity > 0.5 ? 'High' : 'Normal'}
                       </span>
                     </div>
                   </div>
