@@ -96,7 +96,7 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
                     </div>
                   </div>
                   <div style={{ 
-                    marginTop: '10px', pt: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', 
+                    marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', 
                     fontSize: '8px', color: 'var(--gray-500)', fontStyle: 'italic'
                   }}>
                     Formula: Based on deadline proximity.
