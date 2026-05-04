@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db, type Habit, type Task } from '@/lib/db';
-import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore } from '@/lib/riskEngine';
+import { logHabitCompletion, runMorningRecon, isReconDue, calculateRiskScore, syncAllRisks } from '@/lib/riskEngine';
 import { hasAnyProvider, analyzeRisk } from '@/lib/gemini';
 import SentryInput from '@/components/SentryInput';
 import HabitCard from '@/components/HabitCard';
@@ -39,6 +39,9 @@ export default function HomePage() {
 
   // ── Data Loading ─────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
+    // Recalculate deterministic math scores before loading
+    await syncAllRisks();
+    
     const h = await db.habits.orderBy('priority').toArray();
     const pendingTasks = await db.tasks.where('status').equals('pending').toArray();
     setHabits(h);
@@ -73,6 +76,11 @@ export default function HomePage() {
     }
 
     setAiActive(hasAnyProvider());
+
+    // Refresh data when window is focused
+    const handleFocus = () => loadData();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [loadData]);
 
   // ── Background Risk Auditor (Real-time) ──────────────────────────────────────
@@ -196,7 +204,7 @@ export default function HomePage() {
   const handleExplainHabit = async (habit: Habit) => {
     if (!habit.id) return;
     
-    const { score: riskScore, logsCount } = await calculateRiskScore(habit);
+    const { score: riskScore, logsCount, momentum, gravity, armor, avgJitter } = await calculateRiskScore(habit);
     
     const analysis = await analyzeRisk({
       habitTitle: habit.title,
@@ -205,7 +213,11 @@ export default function HomePage() {
       streakCount: habit.streakCount,
       targetTime: habit.targetTime,
       conversationHistory: [],
-      logsCount
+      logsCount,
+      momentum,
+      gravity,
+      armor,
+      avgJitter
     });
 
     await db.habits.update(habit.id, { 

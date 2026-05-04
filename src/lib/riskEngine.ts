@@ -44,7 +44,14 @@ function getDueDateMinutes(dueDate: number | null): number {
 
 // ── Core Engine ────────────────────────────────────────────────────────────────
 
-export async function calculateRiskScore(habit: Habit): Promise<{ score: number, logsCount: number }> {
+export async function calculateRiskScore(habit: Habit): Promise<{ 
+  score: number, 
+  logsCount: number,
+  momentum?: number,
+  gravity?: number,
+  armor?: number,
+  avgJitter?: number
+}> {
   if (!habit.id) return { score: 0, logsCount: 0 };
 
   const now = Date.now();
@@ -107,7 +114,14 @@ export async function calculateRiskScore(habit: Habit): Promise<{ score: number,
 
   // Clamp to 0-1 range
   const score = Math.min(Math.max(Rs, 0), 1);
-  return { score, logsCount: logs.length };
+  return { 
+    score, 
+    logsCount: logs.length,
+    momentum,
+    gravity,
+    armor,
+    avgJitter: Math.round(drift7d)
+  };
 }
 
 export async function calculateTaskRiskScore(task: Task): Promise<number> {
@@ -135,7 +149,33 @@ export async function calculateTaskRiskScore(task: Task): Promise<number> {
   return Math.min(0.95, risk);
 }
 
+/**
+ * FAST MATH SYNC
+ * Updates all risk scores in the DB based on the deterministic formula.
+ * No AI, no latency.
+ */
+export async function syncAllRisks(): Promise<void> {
+  const habits = await db.habits.toArray();
+  const tasks = await db.tasks.where('status').equals('pending').toArray();
+
+  for (const habit of habits) {
+    const { score } = await calculateRiskScore(habit);
+    await db.habits.update(habit.id!, { 
+      riskScore: score,
+      isBreached: score > BREACH_THRESHOLD 
+    });
+  }
+
+  for (const task of tasks) {
+    const score = await calculateTaskRiskScore(task);
+    await db.tasks.update(task.id!, { riskScore: score });
+  }
+}
+
 export async function runMorningRecon(force = false): Promise<{ habits: Habit[], tasks: Task[] }> {
+  // Always run fast math sync before auditing
+  await syncAllRisks();
+
   const habits = await db.habits.toArray();
   const tasks = await db.tasks.where('status').equals('pending').toArray();
   const breachedHabits: Habit[] = [];
@@ -159,7 +199,7 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
       continue;
     }
 
-    const { score: riskScore, logsCount } = await calculateRiskScore(habit);
+    const { score: riskScore, logsCount, momentum, gravity, armor, avgJitter } = await calculateRiskScore(habit);
     const needsAudit = force || !habit.lastRiskAudit || (Date.now() - habit.lastRiskAudit > twentyMins);
     
     if (needsAudit) {
@@ -176,7 +216,11 @@ export async function runMorningRecon(force = false): Promise<{ habits: Habit[],
           logsCount,
           isCompleted: false,
           lastRiskScore: habit.riskScore,
-          lastRiskExplanation: habit.riskExplanation
+          lastRiskExplanation: habit.riskExplanation,
+          momentum,
+          gravity,
+          armor,
+          avgJitter
         }
       });
     } else if (habit.riskScore > 0.7) {

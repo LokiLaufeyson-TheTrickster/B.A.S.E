@@ -82,6 +82,11 @@ export interface ThinkingPartnerContext {
   logsCount?: number;
   lastRiskScore?: number;
   lastRiskExplanation?: string;
+  // Sub-scores for detailed diagnostics
+  momentum?: number;
+  gravity?: number;
+  armor?: number;
+  avgJitter?: number;
 }
 
 function buildHabitContext(ctx: ThinkingPartnerContext): string {
@@ -97,10 +102,14 @@ function buildHabitContext(ctx: ThinkingPartnerContext): string {
 - Habit: "${ctx.habitTitle}"
 - Status: ${ctx.isCompleted ? 'COMPLETED TODAY' : 'NOT YET COMPLETED TODAY'}
 - Risk Score: ${(ctx.riskScore * 100).toFixed(0)}%
+- Performance Metrics:
+  * Trend (Momentum): ${ctx.momentum ? (ctx.momentum > 1 ? 'Worsening' : 'Improving') : 'Stable'}
+  * Deadline Pressure (Gravity): ${ctx.gravity ? (ctx.gravity * 100).toFixed(0) : 0}%
+  * Discipline Armor (Streak): ${ctx.armor ? (ctx.armor * 100).toFixed(0) : 100}%
+  * Average Lateness: ${ctx.avgJitter ?? 0} minutes
 - Resilience: ${ctx.resilienceValue}%
 - Current Streak: ${ctx.streakCount} days
 - Target Time: ${ctx.targetTime}
-- Historical Logs Count: ${ctx.logsCount ?? 0}
 - Current Time: ${new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
 }
 
@@ -282,10 +291,10 @@ ID_${i}:
 Your job is to provide a ONE-SENTENCE diagnostic for each ID.
 
 Rules for your diagnostic:
-1. Be cold, strict, and data-focused. Don't use insults, but don't be "friendly."
-2. Explain the risk score based on the data (e.g. "A 45-minute drift pattern makes this 85% risk unavoidable.").
-3. If risk is 0%, acknowledge completion coldly. 
-4. If risk is high, pinpoint the failure vector with a tone of disappointment (e.g. "Your momentum is decaying as the deadline approaches.").
+1. Use PLAIN ENGLISH. Do NOT use jargon like "drift", "momentum", "gravity", or "jitter".
+2. Explain the "vibe" of the failure. (e.g., Instead of "momentum loss," say "you've been getting sloppier over the last few days").
+3. Be cold and strict. If risk is high, call out the specific pattern in simple terms.
+4. If risk is 0%, acknowledge completion coldly.
 5. Keep it to EXACTLY one sentence.
 
 Items:
@@ -294,8 +303,8 @@ ${itemsText}
 Response MUST be a JSON object where keys are the IDs (ID_0, ID_1, etc.).
 Example:
 {
-  "ID_0": { "explanation": "Target met; remain vigilant." },
-  "ID_1": { "explanation": "Risk at 90% because you are deviating significantly from your historical performance." }
+  "ID_0": { "explanation": "Target met; keep it that way." },
+  "ID_1": { "explanation": "90% risk because you've been getting later and later all week and the deadline is right now." }
 }`;
 
   // 1. Try Gemini
@@ -378,13 +387,14 @@ Example:
 
 export async function analyzeRisk(ctx: ThinkingPartnerContext): Promise<RiskAnalysis> {
   const prompt = `You are a cold, stern AUDITOR. I have calculated a RISK SCORE of ${(ctx.riskScore * 100).toFixed(0)}% for this ${ctx.isTask ? 'task' : 'habit'}.
-Your job: provide a ONE-SENTENCE stern diagnostic explaining this specific risk level.
+Your job: provide a ONE-SENTENCE stern diagnostic explaining this specific risk level in PLAIN ENGLISH.
 
 Rules:
-1. Be cold and strict. Reference the data (streak, drift, momentum, deadline).
-2. If the score is 0%, state that the target was met.
-3. If the score is high, pinpoint why you are disappointed in the trajectory.
-4. Response MUST be a JSON object with a single key "explanation" (string).
+1. Use PLAIN ENGLISH. No technical jargon like "drift" or "momentum."
+2. Be cold and strict. Focus on the behavior, not the math.
+3. If the score is 0%, state that the target was met.
+4. If the score is high, explain why you are disappointed (e.g., "you're falling into a lazy pattern").
+5. Response MUST be a JSON object with a single key "explanation" (string).
 
 Data:
 ${buildHabitContext(ctx)}
