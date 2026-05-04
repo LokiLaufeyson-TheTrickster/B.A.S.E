@@ -49,7 +49,10 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
   const [isPeeking, setIsPeeking] = React.useState(false);
 
   return (
-    <div className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}>
+    <div 
+      className={`item-card animate-slide-up ${isCompleted ? 'completed' : ''} ${isFailed ? 'completed' : ''} ${isOverdue ? 'breached' : ''}`}
+      style={{ zIndex: isPeeking ? 1000 : 1, position: 'relative' }}
+    >
       <div className={`item-priority p${task.priority}`} />
       <div className="item-content">
         <div className="item-title" style={isFailed ? { textDecoration: 'line-through', color: 'var(--gray-500)' } : undefined}>
@@ -79,12 +82,14 @@ export default function TaskCard({ task, onComplete, onFail, onDelete, onEdit, o
 
               {isPeeking && (
                 <div style={{
-                  position: 'absolute', top: '100%', left: '0', zIndex: 100,
+                  position: 'absolute', top: 'calc(100% + 8px)', left: '0', zIndex: 1001,
                   background: 'var(--black)', border: '1px solid var(--gray-300)',
-                  padding: '12px', borderRadius: 'var(--radius)',
-                  minWidth: '180px', marginTop: '12px',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-                  pointerEvents: 'none'
+                  padding: '16px', borderRadius: 'var(--radius)',
+                  minWidth: '220px',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.9)',
+                  pointerEvents: 'none',
+                  backdropFilter: 'blur(10px)',
+                  borderTop: '2px solid var(--crimson)'
                 }}>
                   <div style={{ fontSize: '8px', letterSpacing: '1px', color: 'var(--gray-500)', marginBottom: '8px', textTransform: 'uppercase' }}>Trajectory Metrics</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
